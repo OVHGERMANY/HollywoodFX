@@ -254,6 +254,14 @@ public class Plugin : BaseUnityPlugin
         }
     }
 
+    private static void SelfDestructDrawer(ConfigEntryBase entry)
+    {
+        if (GUILayout.Button("Tempt Fate"))
+        {
+            Application.Quit();
+        }
+    }
+
     private void SetupConfig(bool visceralCombatDetected)
     {
         const string general = "00. General";
@@ -628,13 +636,13 @@ public class Plugin : BaseUnityPlugin
         KineticsScaling = Config.Bind(whimsy, "Bullet Kinetics Scaling", 1f, new ConfigDescription(
             "Scales the overall kinetic energy, impulse, etc.",
             new AcceptableValueRange<float>(0f, 10f),
-            new ConfigurationManagerAttributes { Order = 3, IsAdvanced = true }
+            new ConfigurationManagerAttributes { Order = 4, IsAdvanced = true }
         ));
 
         _michelinManEnabled = Config.Bind(whimsy, "AcidPhantasm Michelin Man Mode", false, new ConfigDescription(
             "Nunc est Bibendum.",
             null,
-            new ConfigurationManagerAttributes { Order = 2 }
+            new ConfigurationManagerAttributes { Order = 3 }
         ));
         _michelinManEnabled.SettingChanged += (_, _) =>
         {
@@ -645,6 +653,12 @@ public class Plugin : BaseUnityPlugin
         };
         if (_michelinManEnabled.Value)
             _michelinManPatch.Enable();
+        
+        Config.Bind(whimsy, "JPDARKONE Clause", "", new ConfigDescription(
+            "He was so preoccupied with whether he could, he didn't stop to think if he should.",
+            null,
+            new ConfigurationManagerAttributes { Order = 2, CustomDrawer = SelfDestructDrawer }
+        ));
 
         _peenEnabled = Config.Bind(whimsy, "Peen", false, new ConfigDescription(
             "Made you look.",
