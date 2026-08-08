@@ -10,15 +10,15 @@ public class DecalPainter
 {
     private readonly DeferredDecalRenderer _renderer;
 
-    private readonly Dictionary<Material, DeferredDecalRenderer.DeferredDecalMeshDataClass> _dictionary0;
-    private readonly Dictionary<Camera, DeferredDecalRenderer.DeferredDecalBufferClass> _dictionary2;
+    private readonly Dictionary<Material, DeferredDecalRenderer.ManagedMesh> _dictionary0;
+    private readonly Dictionary<Camera, DeferredDecalRenderer.CameraData> _dictionary2;
     
     public DecalPainter(DeferredDecalRenderer renderer)
     {
         _renderer = renderer;
         var traverse = Traverse.Create(_renderer);
-        _dictionary0 = traverse.Field("dictionary_0").GetValue<Dictionary<Material, DeferredDecalRenderer.DeferredDecalMeshDataClass>>();
-        _dictionary2 = traverse.Field("dictionary_2").GetValue<Dictionary<Camera, DeferredDecalRenderer.DeferredDecalBufferClass>>();
+        _dictionary0 = traverse.Field("_meshesDict").GetValue<Dictionary<Material, DeferredDecalRenderer.ManagedMesh>>();
+        _dictionary2 = traverse.Field("_cameras").GetValue<Dictionary<Camera, DeferredDecalRenderer.CameraData>>();
     }
 
     public void DrawDecal(
@@ -32,8 +32,8 @@ public class DecalPainter
         {
             foreach (var keyValuePair in _dictionary2)
                 keyValuePair.Value.IsStaticBufferDirty = true;
-            _renderer.method_7(decal);
+            _renderer.CreateDecalMesh(decal);
         }
-        _renderer.method_6(position, normal, _dictionary0[decal.DecalMaterial], decal, projectorHeight);
+        _renderer.AddCubeToMesh(position, normal, _dictionary0[decal.DecalMaterial], decal, projectorHeight);
     }
 }

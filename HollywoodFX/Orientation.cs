@@ -54,7 +54,7 @@ public static class Orientation
     {
         if (!camDir.IsSet(CamDir.Front) || !camDir.IsSet(CamDir.Angled)) return normal;
 
-        var camera = CameraClass.Instance.Camera;
+        var camera = EFT.CameraControl.CameraManager.Instance.Camera;
         var backward = -camera.transform.forward;
         var angle = Vector3.Angle(backward, normal);
         var adjustment = Mathf.Min(FrontAngleInv - angle, AdjustmentAngle);
@@ -66,7 +66,7 @@ public static class Orientation
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ValueTuple<CamDir, float> GetCamDir(Vector3 normal)
     {
-        var camera = CameraClass.Instance.Camera;
+        var camera = EFT.CameraControl.CameraManager.Instance.Camera;
         var camAngle = Vector3.Angle(camera.transform.forward, normal);
         var camAngleSigned = Vector3.SignedAngle(camera.transform.forward, normal, Vector3.up);
 

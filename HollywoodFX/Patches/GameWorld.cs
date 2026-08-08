@@ -5,6 +5,7 @@ using HollywoodFX.Gore;
 using HollywoodFX.Lighting;
 using SPT.Reflection.Patching;
 using UnityEngine;
+using EFT.Ballistics;
 
 namespace HollywoodFX.Patches;
 
@@ -65,7 +66,7 @@ public class GameWorldStartedPostfixPatch : ModulePatch
         Singleton<MaterialRegistry>.Instance?.SetMipBias(Plugin.MipBias.Value);
         Plugin.Log.LogInfo($"Updated mipmap bias to {Plugin.MipBias.Value}");
         
-        var cam = CameraClass.Instance.Camera;
+        var cam = EFT.CameraControl.CameraManager.Instance.Camera;
         
         if (cam == null || cam.GetComponent<ShadowMapCopy>() != null) return;
         
@@ -83,7 +84,7 @@ public class MichelinManPatch : ModulePatch
 
     [PatchPrefix]
     // ReSharper disable once InconsistentNaming
-    public static void Prefix(EftBulletClass shotResult)
+    public static void Prefix(Shot shotResult)
     {
         var hitCollider = shotResult.HitCollider;
 
@@ -97,7 +98,7 @@ public class MichelinManPatch : ModulePatch
 
         var hitColliderRoot = hitCollider.transform.root;
 
-        if (hitColliderRoot.gameObject.layer != LayerMaskClass.PlayerLayer)
+        if (hitColliderRoot.gameObject.layer != LayersMaskController.PlayerLayer)
             return;
 
         if (hitColliderRoot == ImpactStatic.LocalPlayer.Transform.Original)

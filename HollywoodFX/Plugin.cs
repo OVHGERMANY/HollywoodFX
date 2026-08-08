@@ -685,7 +685,7 @@ public class Plugin : BaseUnityPlugin
 
     public static void ErrorPlayerFeedback(string message)
     {
-        NotificationManagerClass.DisplayWarningNotification(message, ENotificationDurationType.Long);
+        NotificationManager.DisplayWarningNotification(message, ENotificationDurationType.Long);
         Singleton<GUISounds>.Instance.PlayUISound(EUISoundType.ErrorMessage);
     }
 

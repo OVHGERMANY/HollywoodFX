@@ -22,7 +22,7 @@ public class ConcussionController
 
     public ConcussionController(DepthOfField depthOfField)
     {
-        var camera = CameraClass.Instance?.Camera;
+        var camera = EFT.CameraControl.CameraManager.Instance?.Camera;
 
         if (camera == null)
         {
@@ -51,7 +51,7 @@ public class ConcussionController
     
     public void Apply(Vector3 position, float t, float distanceNorm, float maxTime)
     {
-        var camera = CameraClass.Instance.Camera;
+        var camera = EFT.CameraControl.CameraManager.Instance.Camera;
         
         if (camera == null)
             return;

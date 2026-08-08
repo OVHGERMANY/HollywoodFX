@@ -21,7 +21,7 @@ public class DepthOfField
 
     public DepthOfField()
     {
-        var camera = CameraClass.Instance?.Camera;
+        var camera = EFT.CameraControl.CameraManager.Instance?.Camera;
 
         if (camera == null)
         {
