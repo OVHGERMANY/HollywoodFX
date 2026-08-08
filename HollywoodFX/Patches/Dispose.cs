@@ -36,6 +36,8 @@ public class GameWorldDisposePostfixPatch : ModulePatch
 
         ImpactStatic.Kinetics = new ImpactKinetics();
         ImpactStatic.LocalPlayer = null;
+
+        BulletHoles.Clear();
         
         ShotDelegateWrapperPatch.OriginalShotDelegate = null;
         

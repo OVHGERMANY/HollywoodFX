@@ -31,6 +31,12 @@ public class Plugin : BaseUnityPlugin
     public static ConfigEntry<float> EffectSize;
     public static ConfigEntry<bool> TracerImpactsEnabled;
 
+    public static ConfigEntry<bool> BulletHoleScalingEnabled;
+    public static ConfigEntry<float> BulletHoleSize;
+    public static ConfigEntry<float> BulletHoleCaliberScaling;
+    public static ConfigEntry<float> ExitHoleSize;
+    public static ConfigEntry<float> BulletHoleVariance;
+
     public static ConfigEntry<float> ExplosionDensityFireball;
     public static ConfigEntry<float> ExplosionDensityDebris;
     public static ConfigEntry<float> ExplosionDensitySparks;
@@ -183,6 +189,14 @@ public class Plugin : BaseUnityPlugin
         new TextureDecalsPainterVisCheckPatch().Enable();
         new AmmoPoolObjectAutoDestroyPostfixPatch().Enable();
 
+        if (BulletHoleScalingEnabled.Value)
+        {
+            new EffectQueuedBulletHolePatch().Enable();
+            new EffectEmitBulletHolePatch().Enable();
+            new StaticDecalSizePatch().Enable();
+            new DynamicDecalSizePatch().Enable();
+        }
+
         if (MiscShellPhysicsEnabled.Value && !visceralCombatDetected)
             new ShellOnBouncePrefixPatch().Enable();
 
@@ -296,6 +310,31 @@ public class Plugin : BaseUnityPlugin
             new ConfigurationManagerAttributes { Order = 2 }
         ));
 
+        BulletHoleScalingEnabled = Config.Bind(impacts, "Enable Bullet Hole Scaling", true, new ConfigDescription(
+            "Sizes bullet holes by the caliber that made them, and widens the hole where the round exits a surface. Vanilla draws every hole at one fixed size.",
+            null,
+            new ConfigurationManagerAttributes { Order = 8 }
+        ));
+        BulletHoleSize = Config.Bind(impacts, "Bullet Hole Size", 1f, new ConfigDescription(
+            "Overall scale of bullet holes. This is the size a 7.62 leaves; everything else is measured against it.",
+            new AcceptableValueRange<float>(0.25f, 4f),
+            new ConfigurationManagerAttributes { Order = 7 }
+        ));
+        BulletHoleCaliberScaling = Config.Bind(impacts, "Bullet Hole Caliber Scaling", 0.65f, new ConfigDescription(
+            "How strongly caliber drives hole size. 0 makes every caliber identical, 1 scales holes in direct proportion to bullet diameter.",
+            new AcceptableValueRange<float>(0f, 2f),
+            new ConfigurationManagerAttributes { Order = 6 }
+        ));
+        ExitHoleSize = Config.Bind(impacts, "Exit Hole Size", 1.6f, new ConfigDescription(
+            "How much wider the hole is where the round leaves a surface compared to where it entered.",
+            new AcceptableValueRange<float>(1f, 4f),
+            new ConfigurationManagerAttributes { Order = 5 }
+        ));
+        BulletHoleVariance = Config.Bind(impacts, "Bullet Hole Variance", 0.15f, new ConfigDescription(
+            "Random size jitter per hole, so repeated hits on a wall do not read as a stamped pattern. Exit holes get double this.",
+            new AcceptableValueRange<float>(0f, 0.5f),
+            new ConfigurationManagerAttributes { Order = 4 }
+        ));
         TracerImpactsEnabled = Config.Bind(impacts, "Enable Tracer Round Impacts", true, new ConfigDescription(
             "Toggles special impact effects for tracer rounds.",
             null,
