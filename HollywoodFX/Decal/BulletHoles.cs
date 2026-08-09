@@ -28,6 +28,15 @@ internal static class BulletHoles
 
     private static int _next;
 
+    // Speed of each round as it entered a surface, so the exit can be compared against it. A round only ever
+    // has one entry in flight at a time, so this stays small.
+    private const int EntryCapacity = 32;
+
+    private static readonly Shot[] EntryShots = new Shot[EntryCapacity];
+    private static readonly float[] EntrySpeeds = new float[EntryCapacity];
+
+    private static int _nextEntry;
+
     /// Scale for the decal currently being drawn, valid only while Armed.
     public static Vector2 Current = Vector2.one;
 
@@ -43,17 +52,50 @@ internal static class BulletHoles
         for (var i = 0; i < Capacity; i++)
             Positions[i] = Vector3.positiveInfinity;
 
+        for (var i = 0; i < EntryCapacity; i++)
+            EntryShots[i] = null;
+
         _next = 0;
+        _nextEntry = 0;
         Armed = false;
         Current = Vector2.one;
     }
 
     public static void Record(Vector3 position, Shot shot)
     {
+        // Measure consumes the entry sample when it sees the matching exit, so the entry has to be banked first
+        if (shot.IsForwardHit)
+        {
+            EntryShots[_nextEntry] = shot;
+            EntrySpeeds[_nextEntry] = shot.VelocityMagnitude;
+
+            _nextEntry = (_nextEntry + 1) % EntryCapacity;
+        }
+
         Positions[_next] = position;
         Scales[_next] = Measure(shot);
 
         _next = (_next + 1) % Capacity;
+    }
+
+    private static bool TryTakeEntrySpeed(Shot shot, out float speed)
+    {
+        for (var i = 0; i < EntryCapacity; i++)
+        {
+            if (!ReferenceEquals(EntryShots[i], shot))
+                continue;
+
+            speed = EntrySpeeds[i];
+
+            // Shot instances come from a pool, so a consumed sample must not be matched by a later round
+            EntryShots[i] = null;
+
+            return true;
+        }
+
+        speed = 0f;
+
+        return false;
     }
 
     public static bool TryTake(Vector3 position, out Vector2 scale)
@@ -91,12 +133,11 @@ internal static class BulletHoles
         var scale = Plugin.BulletHoleSize.Value * caliber;
         var variance = Plugin.BulletHoleVariance.Value;
 
-        // A back face hit is the round leaving the surface rather than entering it. Exit holes are wider and
-        // far more ragged than entries, so they take an extra multiplier and double the shape jitter.
+        // A back face hit is the round leaving the surface rather than entering it.
         if (!shot.IsForwardHit)
         {
-            scale *= Plugin.ExitHoleSize.Value;
-            variance *= 2f;
+            scale *= ExitScale(shot, out var raggedness);
+            variance *= raggedness;
         }
 
         // Jittering the axes independently stops repeated hits on one wall from reading as a stamped pattern
@@ -104,5 +145,36 @@ internal static class BulletHoles
             scale * (1f + Random.Range(-variance, variance)),
             scale * (1f + Random.Range(-variance, variance))
         );
+    }
+
+    /*
+     * What tears an exit hole open is the energy the round dumped getting through the material, not the energy
+     * it left with. A bullet that sails through plasterboard barely marks the far side; one that spent almost
+     * everything punching out of a car door deformed and tumbled on the way and leaves a wide, ragged tear.
+     *
+     * Kinetic energy is 1/2 m v^2, and it is the same round on both sides of the material, so the mass term
+     * cancels and the retained fraction is simply the square of the speed ratio.
+     */
+    private static float ExitScale(Shot shot, out float raggedness)
+    {
+        var maxScale = Plugin.ExitHoleSize.Value;
+
+        if (!Plugin.ExitHoleEnergyScaling.Value || !TryTakeEntrySpeed(shot, out var entrySpeed) || entrySpeed <= 0.01f)
+        {
+            // Nothing to compare against - a fragment born inside the material, or an exit whose entry never
+            // raised an effect. Fall back to the flat multiplier.
+            raggedness = 2f;
+
+            return maxScale;
+        }
+
+        var speedRatio = Mathf.Clamp01(shot.VelocityMagnitude / entrySpeed);
+        var dumped = 1f - speedRatio * speedRatio;
+
+        // Clean pass-through stays near the entry size and stays tidy; a round that gave up everything opens
+        // all the way to the configured maximum and jitters three times as hard.
+        raggedness = 1f + 2f * dumped;
+
+        return Mathf.Lerp(1f, maxScale, dumped);
     }
 }

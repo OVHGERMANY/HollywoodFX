@@ -35,6 +35,7 @@ public class Plugin : BaseUnityPlugin
     public static ConfigEntry<float> BulletHoleSize;
     public static ConfigEntry<float> BulletHoleCaliberScaling;
     public static ConfigEntry<float> ExitHoleSize;
+    public static ConfigEntry<bool> ExitHoleEnergyScaling;
     public static ConfigEntry<float> BulletHoleVariance;
 
     public static ConfigEntry<float> ExplosionDensityFireball;
@@ -326,14 +327,19 @@ public class Plugin : BaseUnityPlugin
             new ConfigurationManagerAttributes { Order = 6 }
         ));
         ExitHoleSize = Config.Bind(impacts, "Exit Hole Size", 1.6f, new ConfigDescription(
-            "How much wider the hole is where the round leaves a surface compared to where it entered.",
+            "Widest an exit hole can get compared to the entry. With energy scaling on this is the size reached by a round that spent almost everything getting through; a clean pass-through stays near the entry size.",
             new AcceptableValueRange<float>(1f, 4f),
             new ConfigurationManagerAttributes { Order = 5 }
         ));
-        BulletHoleVariance = Config.Bind(impacts, "Bullet Hole Variance", 0.15f, new ConfigDescription(
-            "Random size jitter per hole, so repeated hits on a wall do not read as a stamped pattern. Exit holes get double this.",
-            new AcceptableValueRange<float>(0f, 0.5f),
+        ExitHoleEnergyScaling = Config.Bind(impacts, "Exit Hole Energy Scaling", true, new ConfigDescription(
+            "Sizes each exit hole by how much energy the round dumped getting through, so plasterboard barely marks and a car door tears wide open. Off makes every exit hole use the full multiplier.",
+            null,
             new ConfigurationManagerAttributes { Order = 4 }
+        ));
+        BulletHoleVariance = Config.Bind(impacts, "Bullet Hole Variance", 0.15f, new ConfigDescription(
+            "Random size jitter per hole, so repeated hits on a wall do not read as a stamped pattern. Exit holes scale this up with the energy they dumped, to three times this value at most.",
+            new AcceptableValueRange<float>(0f, 0.5f),
+            new ConfigurationManagerAttributes { Order = 3 }
         ));
         TracerImpactsEnabled = Config.Bind(impacts, "Enable Tracer Round Impacts", true, new ConfigDescription(
             "Toggles special impact effects for tracer rounds.",
