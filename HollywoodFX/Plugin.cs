@@ -24,7 +24,7 @@ namespace HollywoodFX;
 public class Plugin : BaseUnityPlugin
 {
     public const string MajorMinorVersion = "2.0";
-    public const string HollywoodFXVersion = $"{MajorMinorVersion}.5";
+    public const string HollywoodFXVersion = $"{MajorMinorVersion}.11";
 
     public static ManualLogSource Log;
 
@@ -201,18 +201,16 @@ public class Plugin : BaseUnityPlugin
         new TextureDecalsPainterVisCheckPatch().Enable();
         new AmmoPoolObjectAutoDestroyPostfixPatch().Enable();
 
-        if (BulletHoleScalingEnabled.Value || RicochetMarksEnabled.Value ||
-            DirectionalBulletMarksEnabled.Value || MergeOverlappingBulletHoles.Value)
-        {
-            new EffectQueuedBulletHolePatch().Enable();
-            new StaticDecalSizePatch().Enable();
-            new DynamicDecalSizePatch().Enable();
-        }
+        // Surface impact features are configured live.  The suppression and ownership observers must therefore
+        // always be present; their prefixes are inert unless a shot has armed the relevant behavior.
+        new EffectQueuedBulletHolePatch().Enable();
+        new StaticDecalSizePatch().Enable();
+        new DynamicDecalSizePatch().Enable();
+        new DynamicDecalCameraBufferDiagnosticPatch().Enable();
+        new DynamicDecalDrawSubmissionDiagnosticPatch().Enable();
 
-        if (BulletHoleScalingEnabled.Value)
-        {
-            new EffectEmitBulletHolePatch().Enable();
-        }
+        // Scaling is also live-configurable.  The prefix itself is inert while scaling is disabled.
+        new EffectEmitBulletHolePatch().Enable();
 
         if (MiscShellPhysicsEnabled.Value && !visceralCombatDetected)
             new ShellOnBouncePrefixPatch().Enable();

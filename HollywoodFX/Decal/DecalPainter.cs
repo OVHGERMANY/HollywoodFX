@@ -74,26 +74,32 @@ public class DecalPainter
         return _renderer.GetSingleDecal(hitCollider, isGrenade: false);
     }
 
-    public void ObserveVanillaStaticWrite(DeferredDecalRenderer.ManagedMesh mesh)
+    public void ObserveVanillaStaticWrite(
+        DeferredDecalRenderer sourceRenderer,
+        DeferredDecalRenderer.ManagedMesh mesh)
     {
+        if (sourceRenderer == null || sourceRenderer != _renderer)
+            return;
+
         var maxDecals = _rendererTraverse.Field("_maxDecals").GetValue<int>();
 
         if (mesh == null || maxDecals <= 0)
             return;
 
-        var index = _rendererTraverse.Field("_currentDecalIndex").GetValue<int>() % maxDecals;
-        ClaimStaticSlot(mesh, index);
+        var index = NormalizeIndex(_rendererTraverse.Field("_currentDecalIndex").GetValue<int>(), maxDecals);
+
+        if (SlotFitsStaticMesh(mesh, index))
+            ClaimStaticSlot(mesh, index);
     }
 
-    public void ObserveVanillaDynamicWrite()
+    public void ObserveVanillaDynamicWrite(
+        DeferredDecalRenderer sourceRenderer,
+        DynamicDeferredDecalRenderer dynamicDecal)
     {
-        var dynamicDecals = _rendererTraverse.Field("_dynamicDecals").GetValue<List<DynamicDeferredDecalRenderer>>();
-
-        if (dynamicDecals == null || dynamicDecals.Count == 0)
+        if (sourceRenderer == null || sourceRenderer != _renderer || dynamicDecal == null)
             return;
 
-        var index = _rendererTraverse.Field("_currentDynamicDecalIndex").GetValue<int>() % dynamicDecals.Count;
-        ClaimDynamicSlot(dynamicDecals[index]);
+        ClaimDynamicSlot(dynamicDecal);
     }
 
     public bool DrawOrientedDecal(
@@ -209,7 +215,16 @@ public class DecalPainter
         var reused = CanReuseStaticProjector(handle, decal, mesh);
         var currentDecalIndex = reused
             ? handle.Index
-            : _rendererTraverse.Field("_currentDecalIndex").GetValue<int>();
+            : NormalizeIndex(_rendererTraverse.Field("_currentDecalIndex").GetValue<int>(), maxDecals);
+
+        if (!SlotFitsStaticMesh(mesh, currentDecalIndex))
+        {
+            RuntimeDebugTrace.Write(
+                $"oriented static projector skipped: invalid mesh slot index={currentDecalIndex} " +
+                $"vertices={mesh.Vertices?.Length ?? 0}"
+            );
+            return false;
+        }
 
         mesh.PasteProjectorIntoMiddle(
             currentDecalIndex * VerticesPerDecal,
@@ -226,7 +241,9 @@ public class DecalPainter
         if (!reused)
         {
             generation = ClaimStaticSlot(mesh, currentDecalIndex);
-            _rendererTraverse.Field("_currentDecalIndex").SetValue((currentDecalIndex + 1) % maxDecals);
+            _rendererTraverse.Field("_currentDecalIndex").SetValue(
+                NormalizeIndex(currentDecalIndex + 1, maxDecals)
+            );
         }
 
         handle = new OrientedDecalHandle
@@ -271,14 +288,36 @@ public class DecalPainter
         var reused = CanReuseDynamicProjector(
             handle, decal, hitCollider, dynamicDecals, boundingSpheres.Length
         );
-        var currentIndex = reused
-            ? handle.Index
-            : _rendererTraverse.Field("_currentDynamicDecalIndex").GetValue<int>() % dynamicDecals.Count;
 
-        var dynamicDecal = dynamicDecals[currentIndex];
+        DynamicDeferredDecalRenderer dynamicDecal;
+        Transform transformHelper;
+        int currentIndex;
+        int sphereIndex;
+
+        if (reused)
+        {
+            currentIndex = handle.Index;
+            sphereIndex = handle.SphereIndex;
+            dynamicDecal = dynamicDecals[currentIndex];
+            transformHelper = dynamicDecal.TransformHelper;
+        }
+        else if (!TryFindUsableDynamicSlot(
+                     dynamicDecals,
+                     boundingSpheres.Length,
+                     _rendererTraverse.Field("_currentDynamicDecalIndex").GetValue<int>(),
+                     out currentIndex,
+                     out dynamicDecal,
+                     out transformHelper))
+        {
+            RuntimeDebugTrace.Write("oriented dynamic projector skipped: no usable pool slot");
+            return false;
+        }
+        else
+        {
+            sphereIndex = currentIndex;
+        }
+
         var gameObject = dynamicDecal.gameObject;
-        var transformHelper = dynamicDecal.TransformHelper;
-        var sphereIndex = reused ? handle.SphereIndex : currentIndex;
 
         if (gameObject == null || sphereIndex < 0 || sphereIndex >= boundingSpheres.Length)
             return false;
@@ -314,7 +353,9 @@ public class DecalPainter
             var uvStartEnd = GetTileUv(decal, lockFirstTile);
             dynamicDecal.Init(material, cube, surfaceNormal, uvStartEnd, decal.IsTiled, sphereIndex);
             generation = ClaimDynamicSlot(dynamicDecal);
-            _rendererTraverse.Field("_currentDynamicDecalIndex").SetValue((currentIndex + 1) % dynamicDecals.Count);
+            _rendererTraverse.Field("_currentDynamicDecalIndex").SetValue(
+                NormalizeIndex(currentIndex + 1, dynamicDecals.Count)
+            );
         }
 
         _renderer.MakeDynamicBufferDirty();
@@ -358,9 +399,7 @@ public class DecalPainter
             handle.Decal != decal || handle.StaticMesh != mesh)
             return false;
 
-        var vertexIndex = handle.Index * VerticesPerDecal;
-
-        if (vertexIndex < 0 || vertexIndex >= mesh.VertexCount)
+        if (!SlotFitsStaticMesh(mesh, handle.Index))
             return false;
 
         return _staticSlotGenerations.TryGetValue(mesh, out var generations) &&
@@ -397,7 +436,10 @@ public class DecalPainter
 
     private int ClaimStaticSlot(DeferredDecalRenderer.ManagedMesh mesh, int index)
     {
-        var slotCount = mesh.VertexCount / VerticesPerDecal;
+        if (!SlotFitsStaticMesh(mesh, index))
+            return 0;
+
+        var slotCount = mesh.Vertices.Length / VerticesPerDecal;
 
         if (!_staticSlotGenerations.TryGetValue(mesh, out var generations) || generations.Length != slotCount)
         {
@@ -419,6 +461,94 @@ public class DecalPainter
         _dynamicSlotGenerations[dynamicDecal] = generation;
 
         return generation;
+    }
+
+    private bool TryFindUsableDynamicSlot(
+        List<DynamicDeferredDecalRenderer> dynamicDecals,
+        int boundingSphereCount,
+        int preferredIndex,
+        out int index,
+        out DynamicDeferredDecalRenderer dynamicDecal,
+        out Transform transformHelper)
+    {
+        index = -1;
+        dynamicDecal = null;
+        transformHelper = null;
+
+        if (dynamicDecals == null || dynamicDecals.Count == 0 || boundingSphereCount <= 0)
+            return false;
+
+        var firstIndex = NormalizeIndex(preferredIndex, dynamicDecals.Count);
+
+        for (var offset = 0; offset < dynamicDecals.Count; offset++)
+        {
+            var candidateIndex = NormalizeIndex(firstIndex + offset, dynamicDecals.Count);
+
+            if (candidateIndex >= boundingSphereCount)
+                continue;
+
+            var candidate = dynamicDecals[candidateIndex];
+
+            if (candidate == null || candidate.gameObject == null)
+                continue;
+
+            var helper = EnsureDynamicTransformHelper(candidate, candidateIndex);
+
+            if (helper == null)
+                continue;
+
+            index = candidateIndex;
+            dynamicDecal = candidate;
+            transformHelper = helper;
+            return true;
+        }
+
+        return false;
+    }
+
+    private Transform EnsureDynamicTransformHelper(DynamicDeferredDecalRenderer dynamicDecal, int index)
+    {
+        if (dynamicDecal == null)
+            return null;
+
+        if (dynamicDecal.TransformHelper != null)
+            return dynamicDecal.TransformHelper;
+
+        var helperObject = dynamicDecal.GameObjectHelper;
+
+        if (helperObject == null)
+        {
+            helperObject = new GameObject($"DecalHelper{index}");
+            Object.DontDestroyOnLoad(helperObject);
+            dynamicDecal.GameObjectHelper = helperObject;
+        }
+
+        var helper = helperObject.transform;
+        var parent = _rendererTraverse.Field("_dynamicDecalsParent").GetValue<Transform>();
+
+        if (parent != null)
+            helper.parent = parent;
+
+        dynamicDecal.TransformHelper = helper;
+        return helper;
+    }
+
+    private static bool SlotFitsStaticMesh(DeferredDecalRenderer.ManagedMesh mesh, int index)
+    {
+        if (mesh == null || mesh.Vertices == null || index < 0)
+            return false;
+
+        var vertexIndex = index * VerticesPerDecal;
+        return vertexIndex >= 0 && vertexIndex + VerticesPerDecal <= mesh.Vertices.Length;
+    }
+
+    private static int NormalizeIndex(int index, int length)
+    {
+        if (length <= 0)
+            return -1;
+
+        var normalized = index % length;
+        return normalized < 0 ? normalized + length : normalized;
     }
 
     private int NextGeneration()

@@ -99,7 +99,15 @@ internal static class SurfaceImpactMarks
         if (decal == null)
             return;
 
-        if (Plugin.MergeOverlappingBulletHoles.Value && TryBuildCompoundMark(
+        // An oblique stop needs its own directional footprint on the very first hit.  The compound
+        // builder deliberately draws first hits as a circular, reliable seed, which would otherwise
+        // return early and turn a 60-75 degree impact back into a round hole.  Keep the seed path for
+        // ordinary stops, but let a genuine oblique impact reach the oriented-decal branch below.
+        var shouldDrawOblique = Plugin.DirectionalBulletMarksEnabled.Value &&
+                                !float.IsNaN(incidenceDegrees) &&
+                                incidenceDegrees >= Plugin.ObliqueImpactAngle.Value;
+
+        if (Plugin.MergeOverlappingBulletHoles.Value && !shouldDrawOblique && TryBuildCompoundMark(
                 decal,
                 kinetics.Position,
                 kinetics.Normal,
@@ -149,9 +157,7 @@ internal static class SurfaceImpactMarks
             return;
         }
 
-        if (!Plugin.DirectionalBulletMarksEnabled.Value ||
-            float.IsNaN(incidenceDegrees) ||
-            incidenceDegrees < Plugin.ObliqueImpactAngle.Value)
+        if (!shouldDrawOblique)
             return;
 
         var obliqueness = Mathf.InverseLerp(Plugin.ObliqueImpactAngle.Value, 85f, incidenceDegrees);
@@ -335,7 +341,8 @@ internal static class SurfaceImpactMarks
                 ? hitCollider.transform.InverseTransformDirection(axis).normalized
                 : axis;
 
-            Clusters[_nextCluster] = new ImpactCluster
+            clusterIndex = _nextCluster;
+            Clusters[clusterIndex] = new ImpactCluster
             {
                 Active = true,
                 ColliderId = colliderId,
@@ -354,7 +361,18 @@ internal static class SurfaceImpactMarks
             };
             _nextCluster = (_nextCluster + 1) % ClusterCapacity;
 
-            return false;
+            // Draw the first impact through the same owned-projector path used by later compound updates.  Keeping
+            // the initial handle lets the next nearby shot resize this exact mark instead of layering another
+            // projector over a separately allocated stock decal.
+            center = position;
+            compoundNormal = surfaceNormal;
+            axis = GetSurfaceAxis(shotDirection, surfaceNormal);
+            lengthMultiplier = 1f;
+            widthMultiplier = 1f;
+            sizeMultiplier = shotRadius / rawRadius;
+            hits = 1;
+
+            return true;
         }
 
         var match = Clusters[nearestIndex];
