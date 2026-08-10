@@ -38,6 +38,7 @@ public class GameWorldDisposePostfixPatch : ModulePatch
         ImpactStatic.LocalPlayer = null;
 
         BulletHoles.Clear();
+        SurfaceImpactMarks.Clear();
         
         ShotDelegateWrapperPatch.OriginalShotDelegate = null;
         

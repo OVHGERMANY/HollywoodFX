@@ -3,6 +3,7 @@ using Comfort.Common;
 using EFT;
 using EFT.Ballistics;
 using HarmonyLib;
+using HollywoodFX.Decal;
 using HollywoodFX.Gore;
 using SPT.Reflection.Patching;
 using Systems.Effects;
@@ -79,6 +80,7 @@ public class EffectsEmitPatch : ModulePatch
             return;
 
         ImpactStatic.Kinetics.Update(material, position, normal, isHitPointVisible);
+        SurfaceImpactMarks.TryDraw(ImpactStatic.Kinetics, hitCollider);
         Singleton<ImpactController>.Instance.Emit(ImpactStatic.Kinetics);
     }
 }

@@ -4,6 +4,13 @@ using Random = UnityEngine.Random;
 
 namespace HollywoodFX.Decal;
 
+internal enum BulletHoleKind : byte
+{
+    Stopped,
+    PenetrationEntry,
+    PenetrationExit
+}
+
 /*
  * Per-shot sizing for the game's bullet hole decals.
  *
@@ -21,10 +28,19 @@ internal static class BulletHoles
     // 7.62 sits in the middle of the ammo table, so it is the caliber that renders at the configured size
     private const float ReferenceCaliberMm = 7.62f;
 
+    // DeferredDecalRenderer clamps static decals to this size. The transpiler keeps that vanilla ceiling for
+    // ordinary decals but raises it proportionally while a configured bullet-hole scale is armed.
+    private const float VanillaStaticDecalMaxSize = 0.4f;
+
+    // An exit that is allowed to fall back to entry size is visually ambiguous. Keep even a clean
+    // pass-through large enough to read from the back face; energy loss can then widen it further.
+    private const float MinimumReadableExitScale = 1.35f;
+
     private const int Capacity = 64;
 
     private static readonly Vector3[] Positions = new Vector3[Capacity];
-    private static readonly Vector2[] Scales = new Vector2[Capacity];
+    private static readonly float[] Scales = new float[Capacity];
+    private static readonly BulletHoleKind[] Kinds = new BulletHoleKind[Capacity];
 
     private static int _next;
 
@@ -38,9 +54,38 @@ internal static class BulletHoles
     private static int _nextEntry;
 
     /// Scale for the decal currently being drawn, valid only while Armed.
-    public static Vector2 Current = Vector2.one;
+    public static float Current = 1f;
+
+    public static BulletHoleKind CurrentKind = BulletHoleKind.Stopped;
 
     public static bool Armed;
+
+    // The stock atlas contains several crater paintings with very different visible footprints. Lock forward
+    // impacts to one tile so caliber and the configured variance control their apparent size. Exit holes keep
+    // the atlas variety because their broken back-face edge is intentionally irregular.
+    public static bool ShouldLockAtlasTile => CurrentKind != BulletHoleKind.PenetrationExit;
+
+    public static float GetStaticDecalSizeLimit()
+    {
+        if (!Armed)
+            return VanillaStaticDecalMaxSize;
+
+        return VanillaStaticDecalMaxSize * Current;
+    }
+
+    /// <summary>
+    /// EFT stores a random minimum/maximum radius in SingleDecal.DecalSize; its two components are not X/Y
+    /// dimensions. Resolve that vanilla range to its midpoint and apply this shot's scalar multiplier once,
+    /// otherwise EFT's own random range compounds with our variance and identical rounds can render nearly
+    /// twice as wide as one another.
+    /// </summary>
+    public static Vector2 ResolveDecalSize(Vector2 vanillaRange)
+    {
+        var midpoint = (vanillaRange.x + vanillaRange.y) * 0.5f;
+        var resolved = midpoint * Current;
+
+        return new Vector2(resolved, resolved);
+    }
 
     static BulletHoles()
     {
@@ -58,13 +103,16 @@ internal static class BulletHoles
         _next = 0;
         _nextEntry = 0;
         Armed = false;
-        Current = Vector2.one;
+        Current = 1f;
+        CurrentKind = BulletHoleKind.Stopped;
     }
 
     public static void Record(Vector3 position, Shot shot)
     {
+        var kind = Classify(shot);
+
         // Measure consumes the entry sample when it sees the matching exit, so the entry has to be banked first
-        if (shot.IsForwardHit)
+        if (kind == BulletHoleKind.PenetrationEntry)
         {
             EntryShots[_nextEntry] = shot;
             EntrySpeeds[_nextEntry] = shot.VelocityMagnitude;
@@ -73,7 +121,14 @@ internal static class BulletHoles
         }
 
         Positions[_next] = position;
-        Scales[_next] = Measure(shot);
+        Scales[_next] = Measure(shot, kind);
+        Kinds[_next] = kind;
+
+        RuntimeDebugTrace.Write(
+            $"bullet-hole queued kind={kind} state={shot.BulletState} forward={shot.IsForwardHit} " +
+            $"diameterMm={shot.BulletDiameterMilimeters:0.###} " +
+            $"velocity={shot.VelocityMagnitude:0.###} scale={Scales[_next]:0.###} position={position.ToString("F4")}"
+        );
 
         _next = (_next + 1) % Capacity;
     }
@@ -98,7 +153,7 @@ internal static class BulletHoles
         return false;
     }
 
-    public static bool TryTake(Vector3 position, out Vector2 scale)
+    public static bool TryTake(Vector3 position, out float scale, out BulletHoleKind kind)
     {
         for (var i = 0; i < Capacity; i++)
         {
@@ -108,6 +163,7 @@ internal static class BulletHoles
                 continue;
 
             scale = Scales[i];
+            kind = Kinds[i];
 
             // Consume it so a recycled position can never pick up a stale size
             Positions[i] = Vector3.positiveInfinity;
@@ -115,36 +171,60 @@ internal static class BulletHoles
             return true;
         }
 
-        scale = Vector2.one;
+        scale = 1f;
+        kind = BulletHoleKind.Stopped;
 
         return false;
     }
 
-    private static Vector2 Measure(Shot shot)
+    private static BulletHoleKind Classify(Shot shot)
+    {
+        if (!shot.IsForwardHit)
+            return BulletHoleKind.PenetrationExit;
+
+        return shot.BulletState is Shot.EBulletState.StopHit or Shot.EBulletState.RicochetHit
+            ? BulletHoleKind.Stopped
+            : BulletHoleKind.PenetrationEntry;
+    }
+
+    public static float GetForwardScale(Shot shot, bool includeVariance)
     {
         var diameter = shot.BulletDiameterMilimeters;
 
         if (diameter <= 0f)
             diameter = ReferenceCaliberMm;
 
-        // Taking the ratio to a power keeps the spread readable: at 1.0 a 12.7 punches a hole 1.67x a 7.62,
-        // which is too coarse on screen, so the default pulls the exponent below 1 to compress the extremes.
         var caliber = Mathf.Pow(diameter / ReferenceCaliberMm, Plugin.BulletHoleCaliberScaling.Value);
         var scale = Plugin.BulletHoleSize.Value * caliber;
+
+        if (!includeVariance)
+            return scale;
+
         var variance = Plugin.BulletHoleVariance.Value;
 
-        // A back face hit is the round leaving the surface rather than entering it.
-        if (!shot.IsForwardHit)
+        return scale * (1f + Random.Range(-variance, variance));
+    }
+
+    private static float Measure(Shot shot, BulletHoleKind kind)
+    {
+        // Taking the caliber ratio to a power keeps the spread readable: at 1.0 a 12.7 punches a hole 1.67x
+        // a 7.62, which is too coarse on screen, so the default exponent compresses the extremes.
+        var scale = GetForwardScale(shot, includeVariance: false);
+        var variance = Plugin.BulletHoleVariance.Value;
+
+        if (kind == BulletHoleKind.PenetrationExit)
         {
             scale *= ExitScale(shot, out var raggedness);
             variance *= raggedness;
+
+            // Never let exit jitter shrink a readable blowout back toward entry size. Variation only grows
+            // the exit, while the retained-energy calculation controls its guaranteed baseline.
+            return scale * (1f + Random.Range(0f, variance));
         }
 
-        // Jittering the axes independently stops repeated hits on one wall from reading as a stamped pattern
-        return new Vector2(
-            scale * (1f + Random.Range(-variance, variance)),
-            scale * (1f + Random.Range(-variance, variance))
-        );
+        // SingleDecal.DecalSize is a min/max range rather than two axes. Resolve that range elsewhere and use
+        // one small scalar jitter here so caliber remains the dominant, readable size signal.
+        return scale * (1f + Random.Range(-variance, variance));
     }
 
     /*
@@ -157,7 +237,7 @@ internal static class BulletHoles
      */
     private static float ExitScale(Shot shot, out float raggedness)
     {
-        var maxScale = Plugin.ExitHoleSize.Value;
+        var maxScale = Mathf.Max(MinimumReadableExitScale, Plugin.ExitHoleSize.Value);
 
         if (!Plugin.ExitHoleEnergyScaling.Value || !TryTakeEntrySpeed(shot, out var entrySpeed) || entrySpeed <= 0.01f)
         {
@@ -165,16 +245,28 @@ internal static class BulletHoles
             // raised an effect. Fall back to the flat multiplier.
             raggedness = 2f;
 
+            RuntimeDebugTrace.Write(
+                $"penetration exit unpairedOrFlat exitVelocity={shot.VelocityMagnitude:0.###} " +
+                $"multiplier={maxScale:0.###}"
+            );
+
             return maxScale;
         }
 
         var speedRatio = Mathf.Clamp01(shot.VelocityMagnitude / entrySpeed);
         var dumped = 1f - speedRatio * speedRatio;
 
-        // Clean pass-through stays near the entry size and stays tidy; a round that gave up everything opens
-        // all the way to the configured maximum and jitters three times as hard.
+        // A clean pass-through uses the guaranteed readable baseline; a round that gave up almost everything
+        // opens toward the configured maximum and gains a more irregular edge.
         raggedness = 1f + 2f * dumped;
 
-        return Mathf.Lerp(1f, maxScale, dumped);
+        var result = Mathf.Lerp(MinimumReadableExitScale, maxScale, dumped);
+
+        RuntimeDebugTrace.Write(
+            $"penetration exit entryVelocity={entrySpeed:0.###} exitVelocity={shot.VelocityMagnitude:0.###} " +
+            $"retainedEnergy={1f - dumped:0.###} dumpedEnergy={dumped:0.###} multiplier={result:0.###}"
+        );
+
+        return result;
     }
 }

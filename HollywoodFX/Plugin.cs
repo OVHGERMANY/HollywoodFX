@@ -24,7 +24,7 @@ namespace HollywoodFX;
 public class Plugin : BaseUnityPlugin
 {
     public const string MajorMinorVersion = "2.0";
-    public const string HollywoodFXVersion = $"{MajorMinorVersion}.0";
+    public const string HollywoodFXVersion = $"{MajorMinorVersion}.5";
 
     public static ManualLogSource Log;
 
@@ -37,6 +37,15 @@ public class Plugin : BaseUnityPlugin
     public static ConfigEntry<float> ExitHoleSize;
     public static ConfigEntry<bool> ExitHoleEnergyScaling;
     public static ConfigEntry<float> BulletHoleVariance;
+
+    public static ConfigEntry<bool> DirectionalBulletMarksEnabled;
+    public static ConfigEntry<float> ObliqueImpactAngle;
+    public static ConfigEntry<bool> MergeOverlappingBulletHoles;
+    public static ConfigEntry<float> BulletHoleMergeDistance;
+
+    public static ConfigEntry<bool> RicochetMarksEnabled;
+    public static ConfigEntry<float> RicochetMarkLength;
+    public static ConfigEntry<float> RicochetMarkWidth;
 
     public static ConfigEntry<float> ExplosionDensityFireball;
     public static ConfigEntry<float> ExplosionDensityDebris;
@@ -107,6 +116,8 @@ public class Plugin : BaseUnityPlugin
     private static ConfigEntry<bool> _peenEnabled;
 
     private static ConfigEntry<bool> _loggingEnabled;
+    public static bool DebugLoggingEnabled => _loggingEnabled?.Value == true;
+
     public static ConfigEntry<int> DebugIdx;
 
     private static MichelinManPatch _michelinManPatch;
@@ -190,12 +201,17 @@ public class Plugin : BaseUnityPlugin
         new TextureDecalsPainterVisCheckPatch().Enable();
         new AmmoPoolObjectAutoDestroyPostfixPatch().Enable();
 
-        if (BulletHoleScalingEnabled.Value)
+        if (BulletHoleScalingEnabled.Value || RicochetMarksEnabled.Value ||
+            DirectionalBulletMarksEnabled.Value || MergeOverlappingBulletHoles.Value)
         {
             new EffectQueuedBulletHolePatch().Enable();
-            new EffectEmitBulletHolePatch().Enable();
             new StaticDecalSizePatch().Enable();
             new DynamicDecalSizePatch().Enable();
+        }
+
+        if (BulletHoleScalingEnabled.Value)
+        {
+            new EffectEmitBulletHolePatch().Enable();
         }
 
         if (MiscShellPhysicsEnabled.Value && !visceralCombatDetected)
@@ -243,6 +259,7 @@ public class Plugin : BaseUnityPlugin
         if (_loggingEnabled.Value)
         {
             Log.LogInfo("Logging enabled");
+            RuntimeDebugTrace.StartSession();
         }
         else
         {
@@ -305,6 +322,42 @@ public class Plugin : BaseUnityPlugin
         /*
          * Impacts
          */
+        DirectionalBulletMarksEnabled = Config.Bind(impacts, "Enable Directional Bullet Marks", true, new ConfigDescription(
+            "Replaces the square projector for oblique stopped hits, producing an oval gouge aligned with the real incoming trajectory.",
+            null,
+            new ConfigurationManagerAttributes { Order = 15 }
+        ));
+        ObliqueImpactAngle = Config.Bind(impacts, "Oblique Impact Angle", 35f, new ConfigDescription(
+            "Incidence angle from the surface normal where a stopped round changes from a compact crater to a directional gouge.",
+            new AcceptableValueRange<float>(20f, 75f),
+            new ConfigurationManagerAttributes { Order = 14 }
+        ));
+        MergeOverlappingBulletHoles = Config.Bind(impacts, "Merge Overlapping Bullet Holes", true, new ConfigDescription(
+            "Combines nearby stopped impacts into one retained damage footprint whose direction locks to the first meaningful pair of hits.",
+            null,
+            new ConfigurationManagerAttributes { Order = 13 }
+        ));
+        BulletHoleMergeDistance = Config.Bind(impacts, "Bullet Hole Merge Distance", 1.9f, new ConfigDescription(
+            "How close two impact centers must be, measured in base crater radii, before they form one compound damage mark.",
+            new AcceptableValueRange<float>(1f, 3f),
+            new ConfigurationManagerAttributes { Order = 12 }
+        ));
+        RicochetMarksEnabled = Config.Bind(impacts, "Enable Ricochet Scrape Marks", true, new ConfigDescription(
+            "Draws a directional scrape where the ballistics engine reports a real ricochet, including moving doors and props.",
+            null,
+            new ConfigurationManagerAttributes { Order = 11 }
+        ));
+        RicochetMarkLength = Config.Bind(impacts, "Ricochet Mark Length", 1f, new ConfigDescription(
+            "Length multiplier for ricochet scrape marks. The mark is aligned with the incoming round's travel along the surface.",
+            new AcceptableValueRange<float>(0.25f, 3f),
+            new ConfigurationManagerAttributes { Order = 10 }
+        ));
+        RicochetMarkWidth = Config.Bind(impacts, "Ricochet Mark Width", 0.35f, new ConfigDescription(
+            "Width multiplier for ricochet scrape marks. Values below 0.35 are kept readable at 0.35 internally.",
+            new AcceptableValueRange<float>(0.05f, 1f),
+            new ConfigurationManagerAttributes { Order = 9 }
+        ));
+
         EffectSize = Config.Bind(impacts, "Impact Effect Size", 0.75f, new ConfigDescription(
             "Scales the size of impact effects.",
             new AcceptableValueRange<float>(0.1f, 5f),
@@ -312,7 +365,7 @@ public class Plugin : BaseUnityPlugin
         ));
 
         BulletHoleScalingEnabled = Config.Bind(impacts, "Enable Bullet Hole Scaling", true, new ConfigDescription(
-            "Sizes bullet holes by the caliber that made them, and widens the hole where the round exits a surface. Vanilla draws every hole at one fixed size.",
+            "Sizes bullet holes by caliber, keeps forward-impact artwork consistent, and makes penetrated back-face exits visibly wider. Vanilla draws every hole at one random atlas size.",
             null,
             new ConfigurationManagerAttributes { Order = 8 }
         ));
@@ -327,17 +380,17 @@ public class Plugin : BaseUnityPlugin
             new ConfigurationManagerAttributes { Order = 6 }
         ));
         ExitHoleSize = Config.Bind(impacts, "Exit Hole Size", 1.6f, new ConfigDescription(
-            "Widest an exit hole can get compared to the entry. With energy scaling on this is the size reached by a round that spent almost everything getting through; a clean pass-through stays near the entry size.",
-            new AcceptableValueRange<float>(1f, 4f),
+            "Widest an exit hole can get compared to the entry. A clean pass-through is always at least 1.35x so it remains visually distinct; energy lost in the material widens it toward this value.",
+            new AcceptableValueRange<float>(1.35f, 4f),
             new ConfigurationManagerAttributes { Order = 5 }
         ));
         ExitHoleEnergyScaling = Config.Bind(impacts, "Exit Hole Energy Scaling", true, new ConfigDescription(
-            "Sizes each exit hole by how much energy the round dumped getting through, so plasterboard barely marks and a car door tears wide open. Off makes every exit hole use the full multiplier.",
+            "Sizes each exit hole by how much energy the round dumped getting through. Clean penetration uses the readable 1.35x baseline; a hard-won exit tears toward the configured maximum. Off makes every exit use the full multiplier.",
             null,
             new ConfigurationManagerAttributes { Order = 4 }
         ));
-        BulletHoleVariance = Config.Bind(impacts, "Bullet Hole Variance", 0.15f, new ConfigDescription(
-            "Random size jitter per hole, so repeated hits on a wall do not read as a stamped pattern. Exit holes scale this up with the energy they dumped, to three times this value at most.",
+        BulletHoleVariance = Config.Bind(impacts, "Bullet Hole Variance", 0.08f, new ConfigDescription(
+            "Small scalar jitter per hole. Forward hits use symmetric variation around caliber size; exit-hole variation only grows the back-face blowout so it cannot become entry-sized.",
             new AcceptableValueRange<float>(0f, 0.5f),
             new ConfigurationManagerAttributes { Order = 3 }
         ));
