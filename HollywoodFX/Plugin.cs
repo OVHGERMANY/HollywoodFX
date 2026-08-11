@@ -24,7 +24,7 @@ namespace HollywoodFX;
 public class Plugin : BaseUnityPlugin
 {
     public const string MajorMinorVersion = "2.0";
-    public const string HollywoodFXVersion = $"{MajorMinorVersion}.11";
+    public const string HollywoodFXVersion = $"{MajorMinorVersion}.12";
 
     public static ManualLogSource Log;
 
@@ -206,8 +206,12 @@ public class Plugin : BaseUnityPlugin
         new EffectQueuedBulletHolePatch().Enable();
         new StaticDecalSizePatch().Enable();
         new DynamicDecalSizePatch().Enable();
-        new DynamicDecalCameraBufferDiagnosticPatch().Enable();
-        new DynamicDecalDrawSubmissionDiagnosticPatch().Enable();
+
+        if (DebugLoggingEnabled)
+        {
+            new DynamicDecalCameraBufferDiagnosticPatch().Enable();
+            new DynamicDecalDrawSubmissionDiagnosticPatch().Enable();
+        }
 
         // Scaling is also live-configurable.  The prefix itself is inert while scaling is disabled.
         new EffectEmitBulletHolePatch().Enable();

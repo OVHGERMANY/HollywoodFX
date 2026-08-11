@@ -62,7 +62,7 @@ public class DepthOfField
     {
         _prism.dofRadius = _scopeAmount + _concussionAmount * Plugin.BattleBlurIntensity.Value;
         
-        if (_prism.dofRadius <= Eps && _prism.useDof)
+        if (_prism.dofRadius <= Eps)
         {
             _prism.dofRadius = 0f;
             _prism.dofBokehFactor = 0f;

@@ -166,12 +166,15 @@ public class DecalPainter
             Mathf.Max(0.001f, baseSize * widthMultiplier)
         );
 
-        RuntimeDebugTrace.Write(
-            $"oriented projector material={decal.DecalMaterial.name} " +
-            $"baseSize={baseSize:0.###} box={boxSize.ToString("F4")} " +
-            $"along={alongSurface.ToString("F4")} across={acrossSurface.ToString("F4")} " +
-            $"normal={surfaceNormal.ToString("F4")}"
-        );
+        if (Plugin.DebugLoggingEnabled)
+        {
+            RuntimeDebugTrace.Write(
+                $"oriented projector material={decal.DecalMaterial.name} " +
+                $"baseSize={baseSize:0.###} box={boxSize.ToString("F4")} " +
+                $"along={alongSurface.ToString("F4")} across={acrossSurface.ToString("F4")} " +
+                $"normal={surfaceNormal.ToString("F4")}"
+            );
+        }
 
         if (hitCollider != null && !hitCollider.gameObject.isStatic)
         {
@@ -219,10 +222,13 @@ public class DecalPainter
 
         if (!SlotFitsStaticMesh(mesh, currentDecalIndex))
         {
-            RuntimeDebugTrace.Write(
-                $"oriented static projector skipped: invalid mesh slot index={currentDecalIndex} " +
-                $"vertices={mesh.Vertices?.Length ?? 0}"
-            );
+            if (Plugin.DebugLoggingEnabled)
+            {
+                RuntimeDebugTrace.Write(
+                    $"oriented static projector skipped: invalid mesh slot index={currentDecalIndex} " +
+                    $"vertices={mesh.Vertices?.Length ?? 0}"
+                );
+            }
             return false;
         }
 
@@ -259,10 +265,13 @@ public class DecalPainter
             ColliderId = 0,
         };
 
-        RuntimeDebugTrace.Write(
-            $"oriented static projector action={(reused ? "updated" : "allocated")} " +
-            $"index={currentDecalIndex} generation={generation}"
-        );
+        if (Plugin.DebugLoggingEnabled)
+        {
+            RuntimeDebugTrace.Write(
+                $"oriented static projector action={(reused ? "updated" : "allocated")} " +
+                $"index={currentDecalIndex} generation={generation}"
+            );
+        }
 
         return true;
     }
@@ -309,7 +318,8 @@ public class DecalPainter
                      out dynamicDecal,
                      out transformHelper))
         {
-            RuntimeDebugTrace.Write("oriented dynamic projector skipped: no usable pool slot");
+            if (Plugin.DebugLoggingEnabled)
+                RuntimeDebugTrace.Write("oriented dynamic projector skipped: no usable pool slot");
             return false;
         }
         else
@@ -378,12 +388,15 @@ public class DecalPainter
                 : transformHelper.localPosition
         };
 
-        RuntimeDebugTrace.Write(
-            $"oriented dynamic projector action={(reused ? "updated" : "allocated")} " +
-            $"collider={hitCollider.name} index={currentIndex} " +
-            $"generation={generation} sphere={sphereIndex} " +
-            $"scale={decalTransform.localScale.ToString("F4")} radius={radius:0.###}"
-        );
+        if (Plugin.DebugLoggingEnabled)
+        {
+            RuntimeDebugTrace.Write(
+                $"oriented dynamic projector action={(reused ? "updated" : "allocated")} " +
+                $"collider={hitCollider.name} index={currentIndex} " +
+                $"generation={generation} sphere={sphereIndex} " +
+                $"scale={decalTransform.localScale.ToString("F4")} radius={radius:0.###}"
+            );
+        }
 
         return true;
     }

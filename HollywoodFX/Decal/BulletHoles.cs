@@ -124,11 +124,14 @@ internal static class BulletHoles
         Scales[_next] = Measure(shot, kind);
         Kinds[_next] = kind;
 
-        RuntimeDebugTrace.Write(
-            $"bullet-hole queued kind={kind} state={shot.BulletState} forward={shot.IsForwardHit} " +
-            $"diameterMm={shot.BulletDiameterMilimeters:0.###} " +
-            $"velocity={shot.VelocityMagnitude:0.###} scale={Scales[_next]:0.###} position={position.ToString("F4")}"
-        );
+        if (Plugin.DebugLoggingEnabled)
+        {
+            RuntimeDebugTrace.Write(
+                $"bullet-hole queued kind={kind} state={shot.BulletState} forward={shot.IsForwardHit} " +
+                $"diameterMm={shot.BulletDiameterMilimeters:0.###} " +
+                $"velocity={shot.VelocityMagnitude:0.###} scale={Scales[_next]:0.###} position={position.ToString("F4")}"
+            );
+        }
 
         _next = (_next + 1) % Capacity;
     }
@@ -245,10 +248,13 @@ internal static class BulletHoles
             // raised an effect. Fall back to the flat multiplier.
             raggedness = 2f;
 
-            RuntimeDebugTrace.Write(
-                $"penetration exit unpairedOrFlat exitVelocity={shot.VelocityMagnitude:0.###} " +
-                $"multiplier={maxScale:0.###}"
-            );
+            if (Plugin.DebugLoggingEnabled)
+            {
+                RuntimeDebugTrace.Write(
+                    $"penetration exit unpairedOrFlat exitVelocity={shot.VelocityMagnitude:0.###} " +
+                    $"multiplier={maxScale:0.###}"
+                );
+            }
 
             return maxScale;
         }
@@ -262,10 +268,13 @@ internal static class BulletHoles
 
         var result = Mathf.Lerp(MinimumReadableExitScale, maxScale, dumped);
 
-        RuntimeDebugTrace.Write(
-            $"penetration exit entryVelocity={entrySpeed:0.###} exitVelocity={shot.VelocityMagnitude:0.###} " +
-            $"retainedEnergy={1f - dumped:0.###} dumpedEnergy={dumped:0.###} multiplier={result:0.###}"
-        );
+        if (Plugin.DebugLoggingEnabled)
+        {
+            RuntimeDebugTrace.Write(
+                $"penetration exit entryVelocity={entrySpeed:0.###} exitVelocity={shot.VelocityMagnitude:0.###} " +
+                $"retainedEnergy={1f - dumped:0.###} dumpedEnergy={dumped:0.###} multiplier={result:0.###}"
+            );
+        }
 
         return result;
     }

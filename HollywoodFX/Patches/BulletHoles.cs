@@ -71,7 +71,9 @@ public class EffectEmitBulletHolePatch : ModulePatch
 
         if (!BulletHoles.TryTake(position, out var scale, out var kind))
         {
-            RuntimeDebugTrace.Write($"bullet-hole draw unmatched position={position.ToString("F4")}");
+            if (Plugin.DebugLoggingEnabled)
+                RuntimeDebugTrace.Write($"bullet-hole draw unmatched position={position.ToString("F4")}");
+
             return;
         }
 
@@ -257,7 +259,7 @@ public class DynamicDecalSizePatch : ModulePatch
         if (dynamicDecals == null || dynamicDecals.Count == 0 ||
             currentDynamicDecalIndex < 0 || currentDynamicDecalIndex >= dynamicDecals.Count)
         {
-            if (BulletHoles.Armed)
+            if (BulletHoles.Armed && Plugin.DebugLoggingEnabled)
             {
                 RuntimeDebugTrace.Write(
                     $"vanilla dynamic projector skipped: invalid slot={currentDynamicDecalIndex} " +
@@ -273,7 +275,7 @@ public class DynamicDecalSizePatch : ModulePatch
 
         if (dynamicDecal == null)
         {
-            if (BulletHoles.Armed)
+            if (BulletHoles.Armed && Plugin.DebugLoggingEnabled)
             {
                 RuntimeDebugTrace.Write(
                     $"vanilla dynamic projector skipped: null slot={currentDynamicDecalIndex} " +
@@ -289,7 +291,7 @@ public class DynamicDecalSizePatch : ModulePatch
 
         Singleton<DecalPainter>.Instance?.ObserveVanillaDynamicWrite(renderer, dynamicDecal);
 
-        if (BulletHoles.Armed)
+        if (BulletHoles.Armed && Plugin.DebugLoggingEnabled)
         {
             var colliderName = hitCollider == null ? "null" : hitCollider.name;
             var materialName = currentMaterial == null ? "NULL" : currentMaterial.name;

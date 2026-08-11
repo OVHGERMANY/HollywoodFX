@@ -57,7 +57,9 @@ internal static class SurfaceImpactMarks
 
         if (shot == null)
         {
-            RuntimeDebugTrace.Write("impact skipped: no current Shot was available");
+            if (Plugin.DebugLoggingEnabled)
+                RuntimeDebugTrace.Write("impact skipped: no current Shot was available");
+
             return;
         }
 
@@ -69,14 +71,17 @@ internal static class SurfaceImpactMarks
         var colliderName = hitCollider == null ? "null" : hitCollider.name;
         var colliderStatic = hitCollider == null || hitCollider.gameObject.isStatic;
 
-        RuntimeDebugTrace.Write(
-            $"impact state={shot.BulletState} forward={shot.IsForwardHit} " +
-            $"incidenceFromNormal={incidenceDegrees:0.###} material={kinetics.Material} " +
-            $"collider={colliderName} colliderStatic={colliderStatic} " +
-            $"diameterMm={shot.BulletDiameterMilimeters:0.###} massGram={shot.BulletMassGram:0.###} " +
-            $"penetrationPower={shot.PenetrationPower:0.###} velocity={shot.VelocityMagnitude:0.###} " +
-            $"position={kinetics.Position.ToString("F4")} direction={direction.ToString("F4")}"
-        );
+        if (Plugin.DebugLoggingEnabled)
+        {
+            RuntimeDebugTrace.Write(
+                $"impact state={shot.BulletState} forward={shot.IsForwardHit} " +
+                $"incidenceFromNormal={incidenceDegrees:0.###} material={kinetics.Material} " +
+                $"collider={colliderName} colliderStatic={colliderStatic} " +
+                $"diameterMm={shot.BulletDiameterMilimeters:0.###} massGram={shot.BulletMassGram:0.###} " +
+                $"penetrationPower={shot.PenetrationPower:0.###} velocity={shot.VelocityMagnitude:0.###} " +
+                $"position={kinetics.Position.ToString("F4")} direction={direction.ToString("F4")}"
+            );
+        }
 
         if (!shot.IsForwardHit || !validGeometry)
             return;
@@ -144,12 +149,15 @@ internal static class SurfaceImpactMarks
                 Clusters[compoundClusterIndex] = cluster;
             }
 
-            RuntimeDebugTrace.Write(
-                $"compound impact drawn={drawn} hits={compoundHits} center={compoundCenter.ToString("F4")} " +
-                $"normal={compoundNormal.ToString("F4")} axis={compoundAxis.ToString("F4")} " +
-                $"axisLocked={cluster.AxisLocked} length={compoundLength:0.###} " +
-                $"width={compoundWidth:0.###} scale={compoundScale:0.###} cluster={compoundClusterIndex}"
-            );
+            if (Plugin.DebugLoggingEnabled)
+            {
+                RuntimeDebugTrace.Write(
+                    $"compound impact drawn={drawn} hits={compoundHits} center={compoundCenter.ToString("F4")} " +
+                    $"normal={compoundNormal.ToString("F4")} axis={compoundAxis.ToString("F4")} " +
+                    $"axisLocked={cluster.AxisLocked} length={compoundLength:0.###} " +
+                    $"width={compoundWidth:0.###} scale={compoundScale:0.###} cluster={compoundClusterIndex}"
+                );
+            }
 
             if (drawn)
                 RegisterReplacement(kinetics.Position, "compound");
@@ -178,10 +186,13 @@ internal static class SurfaceImpactMarks
             lockFirstTile: true
         );
 
-        RuntimeDebugTrace.Write(
-            $"oblique stop drawn={obliqueDrawn} incidence={incidenceDegrees:0.###} " +
-            $"length={lengthMultiplier:0.###} width={widthMultiplier:0.###} scale={sizeMultiplier:0.###}"
-        );
+        if (Plugin.DebugLoggingEnabled)
+        {
+            RuntimeDebugTrace.Write(
+                $"oblique stop drawn={obliqueDrawn} incidence={incidenceDegrees:0.###} " +
+                $"length={lengthMultiplier:0.###} width={widthMultiplier:0.###} scale={sizeMultiplier:0.###}"
+            );
+        }
 
         if (obliqueDrawn)
             RegisterReplacement(kinetics.Position, "oblique-stop");
@@ -200,7 +211,9 @@ internal static class SurfaceImpactMarks
 
         if (painter == null)
         {
-            RuntimeDebugTrace.Write("ricochet scrape skipped: painter=null");
+            if (Plugin.DebugLoggingEnabled)
+                RuntimeDebugTrace.Write("ricochet scrape skipped: painter=null");
+
             return;
         }
 
@@ -213,7 +226,9 @@ internal static class SurfaceImpactMarks
 
         if (decal == null)
         {
-            RuntimeDebugTrace.Write("ricochet scrape skipped: surface bullet decal=null");
+            if (Plugin.DebugLoggingEnabled)
+                RuntimeDebugTrace.Write("ricochet scrape skipped: surface bullet decal=null");
+
             return;
         }
 
@@ -234,12 +249,15 @@ internal static class SurfaceImpactMarks
             lockFirstTile: true
         );
 
-        RuntimeDebugTrace.Write(
-            $"ricochet scrape drawn={drawn} incidence={incidenceDegrees:0.###} " +
-            $"material={decal.DecalMaterial.name} length={lengthMultiplier:0.###} " +
-            $"width={widthMultiplier:0.###} configuredWidth={Plugin.RicochetMarkWidth.Value:0.###} " +
-            $"scale={caliberScale:0.###}"
-        );
+        if (Plugin.DebugLoggingEnabled)
+        {
+            RuntimeDebugTrace.Write(
+                $"ricochet scrape drawn={drawn} incidence={incidenceDegrees:0.###} " +
+                $"material={decal.DecalMaterial.name} length={lengthMultiplier:0.###} " +
+                $"width={widthMultiplier:0.###} configuredWidth={Plugin.RicochetMarkWidth.Value:0.###} " +
+                $"scale={caliberScale:0.###}"
+            );
+        }
 
         if (drawn)
             RegisterReplacement(kinetics.Position, "ricochet");
@@ -512,7 +530,9 @@ internal static class SurfaceImpactMarks
     {
         ReplacedImpactPositions[_nextReplacement] = position;
         _nextReplacement = (_nextReplacement + 1) % ReplacementCapacity;
-        RuntimeDebugTrace.Write($"registered {kind} replacement at {position.ToString("F4")}");
+
+        if (Plugin.DebugLoggingEnabled)
+            RuntimeDebugTrace.Write($"registered {kind} replacement at {position.ToString("F4")}");
     }
 
     public static bool TryConsumeStandardDecalReplacement(Vector3 position)
@@ -523,7 +543,9 @@ internal static class SurfaceImpactMarks
                 continue;
 
             ReplacedImpactPositions[i] = Vector3.positiveInfinity;
-            RuntimeDebugTrace.Write($"suppressed round decal at {position.ToString("F4")}");
+
+            if (Plugin.DebugLoggingEnabled)
+                RuntimeDebugTrace.Write($"suppressed round decal at {position.ToString("F4")}");
 
             return true;
         }

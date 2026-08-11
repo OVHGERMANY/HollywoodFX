@@ -52,7 +52,9 @@ namespace HollywoodFX
                 impactSystem.Emit(kinetics, Plugin.EffectSize.Value);
             }
 
-            if (Plugin.SuppressionEnabled.Value && Singleton<PostProcessing>.Instance != null)
+            var isLocalShot = kinetics.Bullet.Info?.Player is { iPlayer.IsYourPlayer: true };
+
+            if (Plugin.SuppressionEnabled.Value && !isLocalShot && Singleton<PostProcessing>.Instance != null)
             {
                 var duration = 1f * Plugin.SuppressionDuration.Value;
                 var distanceNorm = 3f * kinetics.Bullet.SizeScale * Plugin.SuppressionRange.Value;

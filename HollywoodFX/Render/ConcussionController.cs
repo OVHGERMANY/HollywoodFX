@@ -19,6 +19,7 @@ public class ConcussionController
     private readonly DepthOfField _depthOfField;
     private readonly UltimateBloom _bloom;
     private readonly ConfigEntry<float> _lensDustIntensity;
+    private bool _lensDustAdjusted;
 
     public ConcussionController(DepthOfField depthOfField)
     {
@@ -31,6 +32,12 @@ public class ConcussionController
         }
         
         _bloom = camera.GetComponent<UltimateBloom>();
+        if (_bloom != null)
+        {
+            _minLensDust = _bloom.m_DustIntensity;
+            _maxLensDust = _minLensDust + 4f * Plugin.BattleBlurIntensity.Value;
+        }
+
         _depthOfField = depthOfField;
 
         if (!Chainloader.PluginInfos.ContainsKey("com.janky.hollywoodgraphics")) return;
@@ -82,19 +89,27 @@ public class ConcussionController
         if (_time <= Eps)
         {
             _time = 0f;
-            _depthOfField.ApplyConcussion(0f);            
+            _depthOfField.ApplyConcussion(0f);
+            RestoreLensDust();
             return;
         }
 
         var dofScale = Mathf.Clamp01(_time / 2f);
         
         _depthOfField.ApplyConcussion(dofScale);
-        _bloom.m_DustIntensity = Mathf.Lerp(_minLensDust, _maxLensDust, dofScale);
+        if (_bloom != null)
+        {
+            _bloom.m_DustIntensity = Mathf.Lerp(_minLensDust, _maxLensDust, dofScale);
+            _lensDustAdjusted = true;
+        }
+
         _time -= Time.deltaTime;
     }
     
     public void OnDestroy()
     {
+        RestoreLensDust();
+
         if (_lensDustIntensity == null)
             return;
         
@@ -108,5 +123,13 @@ public class ConcussionController
         
         _minLensDust = _lensDustIntensity.Value;
         _maxLensDust = _lensDustIntensity.Value + 4f * Plugin.BattleBlurIntensity.Value;
+    }
+
+    private void RestoreLensDust()
+    {
+        if (_lensDustAdjusted && _bloom != null)
+            _bloom.m_DustIntensity = _minLensDust;
+
+        _lensDustAdjusted = false;
     }
 }
