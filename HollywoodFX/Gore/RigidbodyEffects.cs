@@ -8,32 +8,18 @@ using Random = UnityEngine.Random;
 
 namespace HollywoodFX.Gore;
 
-internal class DetachOnDisable : MonoBehaviour
-{
-    private void OnDisable()
-    {
-        if (Singleton<Effects>.Instance is null)
-            return;
-
-        transform.SetParent(Singleton<Effects>.Instance.transform);
-        enabled = true;
-    }
-}
-
 internal class RigidbodyEffects : MonoBehaviour
 {
     private float _lifetime = 2f;
 
     private List<ParticleSystem> _pool;
     private Queue<Emission> _active;
-    private Effects _eftEffects;
 
     // public bool Debug;
 
     public void Setup(Effects eftEffects, GameObject prefab, int copyCount, float lifetime, float density)
     {
         _lifetime = lifetime;
-        _eftEffects = eftEffects;
         _pool = [];
         _active = new Queue<Emission>();
 
@@ -64,8 +50,6 @@ internal class RigidbodyEffects : MonoBehaviour
 
         foreach (var effect in _pool)
         {
-            effect.gameObject.AddComponent<DetachOnDisable>();
-
             var particleSystems = effect.GetComponentsInChildren<ParticleSystem>(true);
 
             if (particleSystems == null)
@@ -101,6 +85,11 @@ internal class RigidbodyEffects : MonoBehaviour
 
     public void Update()
     {
+        foreach (var emission in _active)
+        {
+            emission.FollowTarget();
+        }
+
         while (_active.Count > 0)
         {
             var emission = _active.Peek();
@@ -108,7 +97,7 @@ internal class RigidbodyEffects : MonoBehaviour
             if (Time.time - emission.Timestamp > _lifetime)
             {
                 _active.Dequeue();
-                emission.Effect.transform.SetParent(_eftEffects.transform);
+                emission.Effect.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
                 _pool.Add(emission.Effect);
             }
             else
@@ -144,19 +133,54 @@ internal class RigidbodyEffects : MonoBehaviour
             // effect = emission.Effect;
         }
 
+        var target = rigidbody.transform;
+        var localPosition = target.InverseTransformPoint(position);
+        var localNormal = target.InverseTransformDirection(normal);
+        if (localNormal.sqrMagnitude <= Mathf.Epsilon)
+        {
+            localNormal = Vector3.forward;
+        }
+        localNormal.Normalize();
+        var worldNormal = target.TransformDirection(localNormal);
+
         effect.transform.position = position;
         effect.transform.localScale = new Vector3(scale, scale, scale);
-        effect.transform.rotation = Quaternion.LookRotation(normal);
-        effect.transform.SetParent(rigidbody.transform);
+        effect.transform.rotation = Quaternion.LookRotation(worldNormal);
         effect.Play(true);
 
-        _active.Enqueue(new Emission(effect, Time.time));
+        _active.Enqueue(new Emission(
+            effect,
+            target,
+            localPosition,
+            localNormal,
+            Time.time));
     }
 
-    private struct Emission(ParticleSystem effect, float timestamp)
+    private readonly struct Emission(
+        ParticleSystem effect,
+        Transform target,
+        Vector3 localPosition,
+        Vector3 localNormal,
+        float timestamp)
     {
         public readonly ParticleSystem Effect = effect;
+        private readonly Transform _target = target;
+        private readonly Vector3 _localPosition = localPosition;
+        private readonly Vector3 _localNormal = localNormal;
         public readonly float Timestamp = timestamp;
+
+        public void FollowTarget()
+        {
+            if (_target == null || Effect == null)
+            {
+                return;
+            }
+
+            var worldNormal = _target.TransformDirection(_localNormal);
+            Effect.transform.SetPositionAndRotation(
+                _target.TransformPoint(_localPosition),
+                Quaternion.LookRotation(worldNormal));
+        }
     }
 }
 
