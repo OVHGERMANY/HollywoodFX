@@ -203,6 +203,7 @@ public class EffectsAwakePostfixPatch : ModulePatch
         {
             Singleton<ImpactController>.Create(new ImpactController(__instance));
             Singleton<DecalPainter>.Create(new DecalPainter(__instance.DeferredDecals));
+            PenetrationApertures.Initialize(__instance);
             
             if (Plugin.MuzzleEffectsEnabled.Value)
             {

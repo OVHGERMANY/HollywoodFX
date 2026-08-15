@@ -24,7 +24,7 @@ namespace HollywoodFX;
 public class Plugin : BaseUnityPlugin
 {
     public const string MajorMinorVersion = "2.0";
-    public const string HollywoodFXVersion = $"{MajorMinorVersion}.13";
+    public const string HollywoodFXVersion = $"{MajorMinorVersion}.14";
 
     public static ManualLogSource Log;
 
