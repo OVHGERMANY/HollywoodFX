@@ -1,4 +1,5 @@
 using HollywoodFX.Decal;
+using HollywoodFX.Gore;
 
 var tests = new (string Name, Action Run)[]
 {
@@ -7,7 +8,12 @@ var tests = new (string Name, Action Run)[]
     ("unmatched exit creates no aperture", UnmatchedExitCreatesNoAperture),
     ("tracker clear rejects stale pooled shot", ClearRejectsStaleShot),
     ("normal incidence keeps a circular physical aperture", NormalIncidenceIsCircular),
-    ("grazing incidence stretch is bounded", GrazingIncidenceIsBounded)
+    ("grazing incidence stretch is bounded", GrazingIncidenceIsBounded),
+    ("tent body material never emits gore", TentBodyMaterialNeverEmitsGore),
+    ("player body hit emits gore", PlayerBodyHitEmitsGore),
+    ("corpse body hit emits gore", CorpseBodyHitEmitsGore),
+    ("armor material keeps armor effects eligible", ArmorMaterialKeepsArmorEffectsEligible),
+    ("repeated non-body hits never become gore", RepeatedNonBodyHitsNeverBecomeGore)
 };
 
 var failures = 0;
@@ -84,6 +90,39 @@ static void GrazingIncidenceIsBounded()
         minor * PenetrationApertureGeometry.MaximumIncidenceStretch,
         0.000001f,
         "grazing stretch");
+}
+
+static void TentBodyMaterialNeverEmitsGore()
+{
+    Require(!GoreEligibilityPolicy.ShouldEmitGore(materialLooksLikeBody: true, hasPlayerOrCorpseOwner: false),
+        "a body-material tent hit emitted gore without a body owner");
+}
+
+static void PlayerBodyHitEmitsGore()
+{
+    Require(GoreEligibilityPolicy.ShouldEmitGore(materialLooksLikeBody: true, hasPlayerOrCorpseOwner: true),
+        "a player body hit was rejected");
+}
+
+static void CorpseBodyHitEmitsGore()
+{
+    Require(GoreEligibilityPolicy.ShouldEmitGore(materialLooksLikeBody: true, hasPlayerOrCorpseOwner: true),
+        "a corpse body hit was rejected");
+}
+
+static void ArmorMaterialKeepsArmorEffectsEligible()
+{
+    Require(GoreEligibilityPolicy.ShouldEmitGore(materialLooksLikeBody: true, hasPlayerOrCorpseOwner: true),
+        "a player-owned armor or helmet hit was rejected");
+}
+
+static void RepeatedNonBodyHitsNeverBecomeGore()
+{
+    for (var index = 0; index < 128; index++)
+    {
+        Require(!GoreEligibilityPolicy.ShouldEmitGore(materialLooksLikeBody: true, hasPlayerOrCorpseOwner: false),
+            "a repeated world hit became eligible for gore");
+    }
 }
 
 static void Require(bool condition, string message)

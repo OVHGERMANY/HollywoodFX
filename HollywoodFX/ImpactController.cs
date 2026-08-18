@@ -45,7 +45,17 @@ internal class ImpactController
         if (hitColliderRoot != null && hitColliderRoot == localPlayer.Transform.Original && localPlayer.PointOfView == EPointOfView.FirstPerson)
             return;
 
-        var isBodyShot = kinetics.Material is MaterialType.Body or MaterialType.BodyArmor or MaterialType.Helmet or MaterialType.HelmetRicochet;
+        var materialLooksLikeBody = kinetics.Material is MaterialType.Body or MaterialType.BodyArmor or MaterialType.Helmet or MaterialType.HelmetRicochet;
+        var isBodyShot = BodyTargetClassifier.ShouldEmitGore(materialLooksLikeBody, hitColliderRoot, out var bodyOwner);
+
+        if (materialLooksLikeBody && !isBodyShot && Plugin.DebugLoggingEnabled)
+        {
+            RuntimeDebugTrace.Write(
+                $"rejected body-material hit without player/corpse owner material={kinetics.Material} " +
+                $"owner={bodyOwner} collider={kinetics.Bullet.Info?.HitCollider?.name ?? "<null>"} " +
+                $"root={hitColliderRoot?.name ?? "<null>"} penetrated={kinetics.Bullet.Penetrated} " +
+                $"position={kinetics.Position}." );
+        }
 
         if (kinetics.IsHitPointVisible)
         {

@@ -37,6 +37,9 @@ public class GoreController
 
         var hitColliderRoot = bullet.HitColliderRoot;
 
+        if (!BodyTargetClassifier.IsBodyTarget(hitColliderRoot, out _))
+            return;
+
         var rigidbody = bulletInfo.HitCollider.attachedRigidbody;
 
         if (rigidbody == null)

@@ -9,5 +9,6 @@
 
   <ItemGroup>
     <Compile Include="..\HollywoodFX\Decal\PenetrationAperturePlan.cs" Link="Production\PenetrationAperturePlan.cs" />
+    <Compile Include="..\HollywoodFX\Gore\GoreEligibilityPolicy.cs" Link="Production\GoreEligibilityPolicy.cs" />
   </ItemGroup>
 </Project>
