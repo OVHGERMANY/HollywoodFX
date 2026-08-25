@@ -1,0 +1,49 @@
+name: Bug report
+description: Report a reproducible HollywoodFX problem on the official SPT build.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: checkboxes
+    id: official-build
+    attributes:
+      label: Build check
+      options:
+        - label: I reproduced this on the official SPT build, not a custom or ported EFT client.
+          required: true
+  - type: input
+    id: spt-version
+    attributes:
+      label: SPT version
+      description: Use the exact version shown by the SPT launcher or server.
+      placeholder: 4.1.2
+    validations:
+      required: true
+  - type: input
+    id: mod-version
+    attributes:
+      label: HollywoodFX version
+      placeholder: 2.0.14
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include the expected result, the actual result, and exact reproduction steps.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Drag BepInEx/LogOutput.log here after reproducing the problem in a fresh session.
+    validations:
+      required: true
+  - type: textarea
+    id: mods
+    attributes:
+      label: Other installed mods
+      description: List other client mods, especially graphics, gore, ragdoll, and ballistics mods.
+    validations:
+      required: true
