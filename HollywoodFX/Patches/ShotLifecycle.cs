@@ -80,6 +80,7 @@ public class EffectsEmitPatch : ModulePatch
             return;
 
         ImpactStatic.Kinetics.Update(material, position, normal, isHitPointVisible);
+        CharacterImpactMarks.TryDraw(ImpactStatic.Kinetics, hitCollider);
         PenetrationApertures.TryDraw(ImpactStatic.Kinetics, hitCollider);
         SurfaceImpactMarks.TryDraw(ImpactStatic.Kinetics, hitCollider);
         Singleton<ImpactController>.Instance.Emit(ImpactStatic.Kinetics);

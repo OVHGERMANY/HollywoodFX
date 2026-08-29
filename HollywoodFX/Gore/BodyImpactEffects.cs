@@ -31,37 +31,48 @@ public class BodyImpactEffects
         GameObject prefabMain, GameObject prefabSquirts, GameObject prefabBleedouts, GameObject prefabFinishers
     )
     {
-        var effectMap = EffectBundle.LoadPrefab(eftEffects, prefabMain, false);
-        
-        Plugin.Log.LogInfo("Building blood puffs");
-        _puffs =
-        [
-            new EffectSystem(directional:
-                [
-                    new DirectionalEffect(effectMap["Puff_Blood"])
-                ],
-                useOffsetNormals: true
-            ),
-            new EffectSystem(directional:
-                [
-                    new DirectionalEffect(effectMap["Puff_Blood_Front"]),
-                ]
-            )
-        ];
+        _puffs = [];
 
-        Plugin.Log.LogInfo("Building blood sprays");
-        var bloodSprays = effectMap["Spray_Blood"];
-        bloodSprays.ScaleDensity(Plugin.BloodSprayEmission.Value);
-        _sprays = new EffectSystem(directional: [new DirectionalEffect(bloodSprays)]);
+        if (Plugin.BloodRenderOwnership.AllowTransientImpactPuffsAndSprays)
+        {
+            var effectMap = EffectBundle.LoadPrefab(eftEffects, prefabMain, false);
 
-        _squirts = eftEffects.gameObject.AddComponent<RigidbodyEffects>();
-        _squirts.Setup(eftEffects, prefabSquirts, 10, 2f, Plugin.BloodSquirtEmission.Value);
+            Plugin.Log.LogInfo("Building blood puffs");
+            _puffs =
+            [
+                new EffectSystem(directional:
+                    [
+                        new DirectionalEffect(effectMap["Puff_Blood"])
+                    ],
+                    useOffsetNormals: true
+                ),
+                new EffectSystem(directional:
+                    [
+                        new DirectionalEffect(effectMap["Puff_Blood_Front"]),
+                    ]
+                )
+            ];
 
-        _bleedouts = eftEffects.gameObject.AddComponent<RigidbodyEffects>();
-        _bleedouts.Setup(eftEffects, prefabBleedouts, 10, 10f, Plugin.BloodBleedoutEmission.Value);
+            Plugin.Log.LogInfo("Building blood sprays");
+            var bloodSprays = effectMap["Spray_Blood"];
+            bloodSprays.ScaleDensity(Plugin.BloodSprayEmission.Value);
+            _sprays = new EffectSystem(directional: [new DirectionalEffect(bloodSprays)]);
+        }
 
-        _finishers = eftEffects.gameObject.AddComponent<RigidbodyEffects>();
-        _finishers.Setup(eftEffects, prefabFinishers, 15, 3.5f, Plugin.BloodFinisherEmission.Value);
+        if (Plugin.BloodRenderOwnership.AllowImpactSquirts)
+        {
+            _squirts = eftEffects.gameObject.AddComponent<RigidbodyEffects>();
+            _squirts.Setup(eftEffects, prefabSquirts, 10, 2f, Plugin.BloodSquirtEmission.Value);
+        }
+
+        if (Plugin.BloodRenderOwnership.AllowDeathBloodEffects)
+        {
+            _bleedouts = eftEffects.gameObject.AddComponent<RigidbodyEffects>();
+            _bleedouts.Setup(eftEffects, prefabBleedouts, 10, 10f, Plugin.BloodBleedoutEmission.Value);
+
+            _finishers = eftEffects.gameObject.AddComponent<RigidbodyEffects>();
+            _finishers.Setup(eftEffects, prefabFinishers, 15, 3.5f, Plugin.BloodFinisherEmission.Value);
+        }
 
         // Note: duplicated from ImpactEffects
         var puffFront = EffectBundle.Merge(impactEffects["Puff_Front"], impactEffects["Puff_Front_Dusty"]);
@@ -126,6 +137,11 @@ public class BodyImpactEffects
             return;
         }
 
+        // TraumaCore owns blood rendering when present, but HFX still owns non-blood armor debris,
+        // helmet sparks, and stopped-round dust above. Stop only before the penetrated blood layers.
+        if (!Plugin.BloodRenderOwnership.AllowTransientImpactPuffsAndSprays)
+            return;
+
         var sizeScaleKinetics = Mathf.Min(bullet.SizeScale, 1f);
         var chanceScaleArmor = kinetics.Material != MaterialType.Body ? 0.5f : 1f;
         var chanceBase = chanceScaleArmor * Mathf.Min(bullet.ChanceScale, 1f);
@@ -144,7 +160,10 @@ public class BodyImpactEffects
                 timestamp = Time.unscaledTime + 0.5f;
                 
                 // Second roll to decide whether we emit a squirt or a spray
-                if (Random.Range(0f, 1f) < 0.5f && rigidbody.gameObject.layer != LayersMaskController.DeadbodyLayer)
+                if (Plugin.BloodRenderOwnership.AllowImpactSquirts &&
+                    _squirts != null &&
+                    Random.Range(0f, 1f) < 0.5f &&
+                    rigidbody.gameObject.layer != LayersMaskController.DeadbodyLayer)
                 {
                     var normal = kinetics.Normal - bullet.Info.Direction;
                     normal.Normalize();
@@ -158,7 +177,7 @@ public class BodyImpactEffects
                     return;
                 }
 
-                _sprays.Emit(kinetics, sizeScaleKinetics * Plugin.BloodSpraySize.Value);
+                _sprays?.Emit(kinetics, sizeScaleKinetics * Plugin.BloodSpraySize.Value);
             }
         }
 
@@ -182,12 +201,18 @@ public class BodyImpactEffects
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void EmitBleedout(Rigidbody rigidbody, Vector3 position, Vector3 normal, float sizeScale)
     {
+        if (!Plugin.BloodRenderOwnership.AllowDeathBloodEffects || _bleedouts == null)
+            return;
+
         _bleedouts.Emit(rigidbody, position, normal, sizeScale * Plugin.BloodBleedoutSize.Value);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void EmitFinisher(Rigidbody rigidbody, Vector3 position, Vector3 normal, float sizeScale)
     {
+        if (!Plugin.BloodRenderOwnership.AllowDeathBloodEffects || _finishers == null)
+            return;
+
         _finishers.Emit(rigidbody, position, normal, sizeScale * Plugin.BloodFinisherSize.Value);
     }
 }

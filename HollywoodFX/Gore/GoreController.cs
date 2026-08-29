@@ -70,7 +70,8 @@ public class GoreController
                 ApplyRagdollImpulse(kinetics, bulletInfo, hitColliderRoot, rigidbody, applyUpthrust);
             }
 
-            if (Plugin.WoundDecalsEnabled.Value)
+            if (Plugin.WoundDecalsEnabled.Value &&
+                Plugin.BloodRenderOwnership.AllowBodyWoundTextureEmission)
             {
                 // Hackery for adding decals to dead bodies 
                 if (player != null || hitColliderRoot.TryGetComponent(out player))
@@ -87,9 +88,7 @@ public class GoreController
         }
 
         if (Plugin.GoreEnabled.Value)
-        {
             _bodyImpactEffects.Emit(kinetics, rigidbody);
-        }
     }
 
     public static float CalculateImpactImpulse(float impulse, float penetration)

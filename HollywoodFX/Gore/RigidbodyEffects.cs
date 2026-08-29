@@ -50,6 +50,9 @@ internal class RigidbodyEffects : MonoBehaviour
 
         foreach (var effect in _pool)
         {
+            if (!Plugin.BloodRenderOwnership.AllowParticleCollisionEnvironmentDeposits)
+                continue;
+
             var particleSystems = effect.GetComponentsInChildren<ParticleSystem>(true);
 
             if (particleSystems == null)
@@ -200,6 +203,9 @@ public class BloodSquirtCollisionHandler : MonoBehaviour
 
     public void OnParticleCollision(GameObject other)
     {
+        if (!Plugin.BloodRenderOwnership.AllowParticleCollisionEnvironmentDeposits)
+            return;
+
         if (other == null)
             return;
 

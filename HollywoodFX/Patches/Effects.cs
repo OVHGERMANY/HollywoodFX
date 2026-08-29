@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
 using Comfort.Common;
 using DeferredDecals;
@@ -17,6 +18,8 @@ namespace HollywoodFX.Patches;
 
 public class EffectsAwakePrefixPatch : ModulePatch
 {
+    private static readonly List<Material> OwnedBloodMaterials = new();
+
     protected override MethodBase GetTargetMethod()
     {
         return typeof(Effects).GetMethod(nameof(Effects.Awake));
@@ -59,7 +62,7 @@ public class EffectsAwakePrefixPatch : ModulePatch
         Plugin.Log.LogInfo("Getting Effects Component");
         var decalsHfxEffects = decalsHfxInstance.GetComponent<Effects>();
 
-        if (Plugin.WoundDecalsEnabled.Value)
+        if (Plugin.WoundDecalsEnabled.Value && Plugin.BloodRenderOwnership.AllowBodyWoundTextureDecals)
         {
             var texDecalsOrigTraverse = Traverse.Create(eftEffects.TexDecals);
 
@@ -78,7 +81,8 @@ public class EffectsAwakePrefixPatch : ModulePatch
             }
         }
 
-        if (Plugin.BloodSplatterDecalsEnabled.Value)
+        if (Plugin.BloodSplatterDecalsEnabled.Value &&
+            Plugin.BloodRenderOwnership.AllowEnvironmentDecalOverrides)
         {
             var decalRenderer = eftEffects.DeferredDecals;
 
@@ -89,22 +93,49 @@ public class EffectsAwakePrefixPatch : ModulePatch
 
             if (bleedingDecalOrig == null || bleedingDecalNew == null) return;
 
-            bleedingDecalOrig.DecalMaterial = bleedingDecalNew.DecalMaterial;
-            bleedingDecalOrig.DynamicDecalMaterial = bleedingDecalNew.DynamicDecalMaterial;
+            var matteStaticMaterial = CreateMatteBloodMaterial(bleedingDecalNew.DecalMaterial, "static");
+            var matteDynamicMaterial = ReferenceEquals(bleedingDecalNew.DecalMaterial, bleedingDecalNew.DynamicDecalMaterial)
+                ? matteStaticMaterial
+                : CreateMatteBloodMaterial(bleedingDecalNew.DynamicDecalMaterial, "dynamic");
+
+            if (matteStaticMaterial != null)
+                bleedingDecalOrig.DecalMaterial = matteStaticMaterial;
+
+            if (matteDynamicMaterial != null)
+                bleedingDecalOrig.DynamicDecalMaterial = matteDynamicMaterial;
+
             bleedingDecalOrig.TileSheetRows = bleedingDecalNew.TileSheetRows;
             bleedingDecalOrig.TileSheetColumns = bleedingDecalNew.TileSheetColumns;
-            bleedingDecalOrig.DecalSize = new Vector2(0.125f, 0.175f) * Plugin.BloodSplatterDecalsSize.Value;
+            BloodDecalPresentation.ResolveBleedingDecalSize(
+                Plugin.BloodSplatterDecalsSize.Value,
+                out var bleedingDecalWidth,
+                out var bleedingDecalHeight);
+            bleedingDecalOrig.DecalSize = new Vector2(bleedingDecalWidth, bleedingDecalHeight);
 
             var splatterDecalOrig = Traverse.Create(decalRenderer).Field("_environmentBlood").GetValue<DeferredDecalRenderer.SingleDecal>();
             var splatterDecalNew = Traverse.Create(decalsHfxEffects.DeferredDecals).Field("_environmentBlood").GetValue<DeferredDecalRenderer.SingleDecal>();
 
             if (splatterDecalOrig == null || splatterDecalNew == null) return;
 
-            splatterDecalOrig.DecalMaterial = splatterDecalNew.DecalMaterial;
-            splatterDecalOrig.DynamicDecalMaterial = splatterDecalNew.DynamicDecalMaterial;
+            var matteSplatterStaticMaterial = CreateMatteBloodMaterial(
+                splatterDecalNew.DecalMaterial, "static environment-splatter");
+            var matteSplatterDynamicMaterial = ReferenceEquals(
+                splatterDecalNew.DecalMaterial, splatterDecalNew.DynamicDecalMaterial)
+                ? matteSplatterStaticMaterial
+                : CreateMatteBloodMaterial(
+                    splatterDecalNew.DynamicDecalMaterial, "dynamic environment-splatter");
+
+            if (matteSplatterStaticMaterial != null)
+                splatterDecalOrig.DecalMaterial = matteSplatterStaticMaterial;
+
+            if (matteSplatterDynamicMaterial != null)
+                splatterDecalOrig.DynamicDecalMaterial = matteSplatterDynamicMaterial;
+
             splatterDecalOrig.TileSheetRows = splatterDecalNew.TileSheetRows;
             splatterDecalOrig.TileSheetColumns = splatterDecalNew.TileSheetColumns;
-            splatterDecalOrig.DecalSize = 1.5f * splatterDecalOrig.DecalSize * Plugin.BloodSplatterDecalsSize.Value;
+            splatterDecalOrig.DecalSize *=
+                BloodDecalPresentation.ResolveEnvironmentDecalScale(
+                    Plugin.BloodSplatterDecalsSize.Value);
         }
 
         var impactDecals = Traverse.Create(decalsHfxEffects.DeferredDecals).Field("_decals").GetValue<DeferredDecalRenderer.SingleDecal[]>();
@@ -112,6 +143,103 @@ public class EffectsAwakePrefixPatch : ModulePatch
         Plugin.Log.LogInfo($"Extracted decal: {Decals.TracerScorchMark} > {Decals.TracerScorchMark.DecalMaterial.name}");
 
         Plugin.Log.LogInfo("Decal overrides complete");
+    }
+
+    private static Material CreateMatteBloodMaterial(Material source, string usage)
+    {
+        if (source == null)
+        {
+            Plugin.Log.LogWarning($"Keeping the existing {usage} blood decal material because the HFX source was null");
+            return null;
+        }
+
+        Material material = null;
+        try
+        {
+            material = new Material(source)
+            {
+                name = $"{source.name} HFX Matte Blood"
+            };
+
+            SetFloatIfPresent(material, "_Glossiness", BloodDecalPresentation.MatteGlossiness);
+            SetFloatIfPresent(material, "Glossiness", BloodDecalPresentation.MatteGlossiness);
+            SetFloatIfPresent(material, "_Metallic", BloodDecalPresentation.DisabledSurfaceResponse);
+            SetFloatIfPresent(material, "Metallic", BloodDecalPresentation.DisabledSurfaceResponse);
+            SetFloatIfPresent(material, "_SpecularHighlights", BloodDecalPresentation.DisabledSurfaceResponse);
+            SetFloatIfPresent(material, "SpecularHighlights", BloodDecalPresentation.DisabledSurfaceResponse);
+            SetFloatIfPresent(material, "_GlossyReflections", BloodDecalPresentation.DisabledSurfaceResponse);
+            SetFloatIfPresent(material, "GlossyReflections", BloodDecalPresentation.DisabledSurfaceResponse);
+            SetFloatIfPresent(material, "_Emission", BloodDecalPresentation.DisabledSurfaceResponse);
+            SetFloatIfPresent(material, "Emission", BloodDecalPresentation.DisabledSurfaceResponse);
+            SetFloatIfPresent(material, "_NormalPower", BloodDecalPresentation.MatteNormalPower);
+            SetFloatIfPresent(material, "NormalPower", BloodDecalPresentation.MatteNormalPower);
+            SetFloatIfPresent(material, "_SpecSmoothness", BloodDecalPresentation.DisabledSurfaceResponse);
+            SetFloatIfPresent(material, "SpecSmoothness", BloodDecalPresentation.DisabledSurfaceResponse);
+            MultiplyColorIfPresent(material, "_Color");
+            MultiplyColorIfPresent(material, "_TintColor");
+            MultiplyColorIfPresent(material, "_BaseColor");
+            SetColorIfPresent(material, "_SpecularColor", Color.clear);
+            SetColorIfPresent(material, "SpecularColor", Color.clear);
+            SetColorIfPresent(material, "_EmissionColor", Color.black);
+            SetColorIfPresent(material, "EmissionColor", Color.black);
+            material.DisableKeyword("_EMISSION");
+
+            OwnedBloodMaterials.Add(material);
+            Plugin.Log.LogInfo($"Prepared one matte {usage} blood decal material from {source.name}");
+            return material;
+        }
+        catch (Exception exception)
+        {
+            if (material != null)
+                Object.Destroy(material);
+
+            Plugin.Log.LogWarning($"Keeping the existing {usage} blood decal material because matte preparation failed: {exception.Message}");
+            return null;
+        }
+    }
+
+    internal static void ReleaseOwnedBloodMaterials()
+    {
+        var released = OwnedBloodMaterials.Count;
+        foreach (var material in OwnedBloodMaterials)
+        {
+            if (material != null)
+                Object.Destroy(material);
+        }
+
+        OwnedBloodMaterials.Clear();
+        if (released > 0)
+            Plugin.Log.LogInfo($"Released {released} owned blood decal material clone(s)");
+    }
+
+    private static void SetFloatIfPresent(Material material, string propertyName, float value)
+    {
+        if (material.HasProperty(propertyName))
+            material.SetFloat(propertyName, value);
+    }
+
+    private static void SetColorIfPresent(Material material, string propertyName, Color value)
+    {
+        if (material.HasProperty(propertyName))
+            material.SetColor(propertyName, value);
+    }
+
+    private static void MultiplyColorIfPresent(Material material, string propertyName)
+    {
+        if (!material.HasProperty(propertyName))
+            return;
+
+        var sourceColor = material.GetColor(propertyName);
+        BloodDecalPresentation.ResolveAbsorbedTint(
+            sourceColor.r,
+            sourceColor.g,
+            sourceColor.b,
+            sourceColor.a,
+            out var red,
+            out var green,
+            out var blue,
+            out var alpha);
+        material.SetColor(propertyName, new Color(red, green, blue, alpha));
     }
 
     private static void SetDecalLimits(Effects effects)

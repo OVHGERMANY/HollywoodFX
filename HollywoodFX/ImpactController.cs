@@ -28,10 +28,22 @@ internal class ImpactController
         
         _impactEffects = new ImpactEffects(eftEffects, impactEffectsMap, impactsTracerPrefab);
 
-        var bloodMainPrefab = AssetRegistry.AssetBundle.LoadAsset<GameObject>("Assets/HollywoodFX/Particles/Prefabs/HFX Blood Main.prefab");
-        var bloodSquirtsPrefab = AssetRegistry.AssetBundle.LoadAsset<GameObject>("Assets/HollywoodFX/Particles/Prefabs/HFX Blood Squirts.prefab");
-        var bloodBleedoutPrefab = AssetRegistry.AssetBundle.LoadAsset<GameObject>("Assets/HollywoodFX/Particles/Prefabs/HFX Blood Bleedout.prefab");
-        var bloodFinishersPrefab = AssetRegistry.AssetBundle.LoadAsset<GameObject>("Assets/HollywoodFX/Particles/Prefabs/HFX Blood Finishers.prefab");
+        GameObject bloodMainPrefab = null;
+        GameObject bloodSquirtsPrefab = null;
+        GameObject bloodBleedoutPrefab = null;
+        GameObject bloodFinishersPrefab = null;
+
+        if (Plugin.BloodRenderOwnership.AllowTransientImpactPuffsAndSprays)
+            bloodMainPrefab = AssetRegistry.AssetBundle.LoadAsset<GameObject>("Assets/HollywoodFX/Particles/Prefabs/HFX Blood Main.prefab");
+
+        if (Plugin.BloodRenderOwnership.AllowImpactSquirts)
+            bloodSquirtsPrefab = AssetRegistry.AssetBundle.LoadAsset<GameObject>("Assets/HollywoodFX/Particles/Prefabs/HFX Blood Squirts.prefab");
+
+        if (Plugin.BloodRenderOwnership.AllowDeathBloodEffects)
+        {
+            bloodBleedoutPrefab = AssetRegistry.AssetBundle.LoadAsset<GameObject>("Assets/HollywoodFX/Particles/Prefabs/HFX Blood Bleedout.prefab");
+            bloodFinishersPrefab = AssetRegistry.AssetBundle.LoadAsset<GameObject>("Assets/HollywoodFX/Particles/Prefabs/HFX Blood Finishers.prefab");
+        }
 
         _goreController = new GoreController(eftEffects, impactEffectsMap, bloodMainPrefab, bloodSquirtsPrefab, bloodBleedoutPrefab, bloodFinishersPrefab);
     }

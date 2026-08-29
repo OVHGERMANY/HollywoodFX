@@ -33,14 +33,16 @@ internal class PlayerOnDeadPostfixPatch : ModulePatch
         if (rigidbody == null)
             return;
 
-        var bloodEffects = Singleton<BodyImpactEffects>.Instance;
+        var bloodEffects = Plugin.BloodRenderOwnership.AllowDeathBloodEffects
+            ? Singleton<BodyImpactEffects>.Instance
+            : null;
 
         if (Time.fixedTime - damage.FrameTime <= 0.3f)
         {
             var scaledImpulse = Mathf.Min(5f * GoreController.CalculateImpactImpulse(damage.Impulse, damage.PenetrationPower), 200f);
             rigidbody.AddForceAtPosition(damage.Direction * scaledImpulse, damage.HitPoint, ForceMode.Impulse);
 
-            if (rigidbody.name.Length >= 11)
+            if (bloodEffects != null && rigidbody.name.Length >= 11)
             {
                 var nameSubset = MemoryExtensions.AsSpan(rigidbody.name, 10);
 
@@ -62,7 +64,7 @@ internal class PlayerOnDeadPostfixPatch : ModulePatch
                 }
             }
         }
-        else
+        else if (bloodEffects != null)
         {
             bloodEffects.EmitBleedout(rigidbody, rigidbody.transform.position, damage.HitNormal, Mathf.Min(damage.SizeScale, 1f));
         }

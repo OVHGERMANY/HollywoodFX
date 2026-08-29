@@ -22,6 +22,8 @@ public class GameWorldDisposePostfixPatch : ModulePatch
     public static void Prefix()
     {
         Plugin.Log.LogInfo("Disposing of static & long lived objects.");
+
+        EffectsAwakePrefixPatch.ReleaseOwnedBloodMaterials();
         
         Singleton<DecalPainter>.Release(Singleton<DecalPainter>.Instance);
         Singleton<ImpactController>.Release(Singleton<ImpactController>.Instance);
@@ -37,6 +39,7 @@ public class GameWorldDisposePostfixPatch : ModulePatch
         ImpactStatic.Kinetics = new ImpactKinetics();
         ImpactStatic.LocalPlayer = null;
 
+        CharacterImpactMarks.Clear();
         PenetrationApertures.Clear();
         BulletHoles.Clear();
         SurfaceImpactMarks.Clear();

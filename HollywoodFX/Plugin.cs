@@ -9,7 +9,9 @@ using BepInEx.Logging;
 using Comfort.Common;
 using EFT.Communications;
 using EFT.UI;
+using HollywoodFX.Decal;
 using HollywoodFX.Explosion;
+using HollywoodFX.Gore;
 using HollywoodFX.Lighting;
 using HollywoodFX.Muzzle.Patches;
 using HollywoodFX.Patches;
@@ -27,6 +29,8 @@ public class Plugin : BaseUnityPlugin
     public const string HollywoodFXVersion = $"{MajorMinorVersion}.14";
 
     public static ManualLogSource Log;
+    public static BloodRenderOwnership BloodRenderOwnership { get; private set; } =
+        BloodRenderOwnershipPolicy.Resolve(traumaCoreLoaded: false);
 
     public static ConfigEntry<float> EffectSize;
     public static ConfigEntry<bool> TracerImpactsEnabled;
@@ -40,8 +44,6 @@ public class Plugin : BaseUnityPlugin
 
     public static ConfigEntry<bool> DirectionalBulletMarksEnabled;
     public static ConfigEntry<float> ObliqueImpactAngle;
-    public static ConfigEntry<bool> MergeOverlappingBulletHoles;
-    public static ConfigEntry<float> BulletHoleMergeDistance;
 
     public static ConfigEntry<bool> RicochetMarksEnabled;
     public static ConfigEntry<float> RicochetMarkLength;
@@ -138,6 +140,20 @@ public class Plugin : BaseUnityPlugin
         yield return new WaitForSeconds(5);
 
         var visceralCombatDetected = Chainloader.PluginInfos.ContainsKey("com.servph.VisceralCombat");
+        var traumaCoreDetected = Chainloader.PluginInfos.ContainsKey(BloodRenderOwnershipPolicy.TraumaCorePluginGuid);
+        BloodRenderOwnership = BloodRenderOwnershipPolicy.Resolve(traumaCoreDetected);
+
+        if (traumaCoreDetected)
+        {
+            Log.LogInfo(
+                "TraumaCore detected: TraumaCore owns blood particles, sustained/death blood, and environment deposition; " +
+                "HollywoodFX retains body wound textures only. HFX transient blood is suppressed because its bundled " +
+                "materials are not safe for the shared presentation.");
+        }
+        else
+        {
+            Log.LogInfo("TraumaCore not detected: HollywoodFX retains standalone blood rendering ownership.");
+        }
 
         var assemblyDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
 
@@ -333,16 +349,6 @@ public class Plugin : BaseUnityPlugin
             "Incidence angle from the surface normal where a stopped round changes from a compact crater to a directional gouge.",
             new AcceptableValueRange<float>(20f, 75f),
             new ConfigurationManagerAttributes { Order = 14 }
-        ));
-        MergeOverlappingBulletHoles = Config.Bind(impacts, "Merge Overlapping Bullet Holes", true, new ConfigDescription(
-            "Combines nearby stopped impacts into one retained damage footprint whose direction locks to the first meaningful pair of hits.",
-            null,
-            new ConfigurationManagerAttributes { Order = 13 }
-        ));
-        BulletHoleMergeDistance = Config.Bind(impacts, "Bullet Hole Merge Distance", 1.9f, new ConfigDescription(
-            "How close two impact centers must be, measured in base crater radii, before they form one compound damage mark.",
-            new AcceptableValueRange<float>(1f, 3f),
-            new ConfigurationManagerAttributes { Order = 12 }
         ));
         RicochetMarksEnabled = Config.Bind(impacts, "Enable Ricochet Scrape Marks", true, new ConfigDescription(
             "Draws a directional scrape where the ballistics engine reports a real ricochet, including moving doors and props.",
@@ -640,7 +646,7 @@ public class Plugin : BaseUnityPlugin
             new ConfigurationManagerAttributes { Order = 2 }
         ));
 
-        BloodSplatterDecalsSize = Config.Bind(goreDecals, "Blood Splatter Decal Size", 1f, new ConfigDescription(
+        BloodSplatterDecalsSize = Config.Bind(goreDecals, "Blood Splatter Decal Size", BloodDecalPresentation.DefaultSizeMultiplier, new ConfigDescription(
             "Adjusts the size of the blood splatters on the environment.",
             new AcceptableValueRange<float>(0f, 5f),
             new ConfigurationManagerAttributes { Order = 1 }

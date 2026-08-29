@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using EFT.Ballistics;
+using HollywoodFX.Gore;
 using Systems.Effects;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -34,6 +35,17 @@ internal static class PenetrationApertures
             kinetics.Normal.sqrMagnitude < 0.000001f ||
             shot.CurrentDirection.sqrMagnitude < 0.000001f)
             return;
+
+        var hasActorOwner = BodyTargetClassifier.IsBodyTarget(
+            hitCollider.transform, out _);
+        if (!CustomImpactGeometryPolicy.ShouldUseCustomGeometry(
+                hitCollider is BodyPartCollider, hasActorOwner))
+        {
+            if (Plugin.DebugLoggingEnabled)
+                RuntimeDebugTrace.Write(
+                    $"penetration aperture skipped: character-owned collider={hitCollider.name}");
+            return;
+        }
 
         var surfaceRenderer = PenetrationApertureRenderer.ResolveSurfaceRenderer(hitCollider);
         if (surfaceRenderer == null)

@@ -8,7 +8,19 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="..\HollywoodFX\Decal\BloodDecalPresentation.cs" Link="Production\BloodDecalPresentation.cs" />
+    <Compile Include="..\HollywoodFX\Decal\CharacterImpactMarkPolicy.cs" Link="Production\CharacterImpactMarkPolicy.cs" />
+    <Compile Include="..\HollywoodFX\Decal\CustomImpactGeometryPolicy.cs" Link="Production\CustomImpactGeometryPolicy.cs" />
     <Compile Include="..\HollywoodFX\Decal\PenetrationAperturePlan.cs" Link="Production\PenetrationAperturePlan.cs" />
+    <Compile Include="..\HollywoodFX\Gore\BloodRenderOwnershipPolicy.cs" Link="Production\BloodRenderOwnershipPolicy.cs" />
     <Compile Include="..\HollywoodFX\Gore\GoreEligibilityPolicy.cs" Link="Production\GoreEligibilityPolicy.cs" />
+    <EmbeddedResource Include="..\HollywoodFX\Decal\SurfaceImpactMarks.cs" Link="ProductionSource\SurfaceImpactMarks.cs" />
+    <EmbeddedResource Include="..\HollywoodFX\Decal\CharacterImpactMarks.cs" Link="ProductionSource\CharacterImpactMarks.cs" />
+    <EmbeddedResource Include="..\HollywoodFX\Patches\ShotLifecycle.cs" Link="ProductionSource\ShotLifecycle.cs" />
+    <EmbeddedResource Include="..\HollywoodFX\Decal\PenetrationApertures.cs" Link="ProductionSource\PenetrationApertures.cs" />
+    <EmbeddedResource Include="..\HollywoodFX\Gore\BodyImpactEffects.cs" Link="ProductionSource\BodyImpactEffects.cs" />
+    <EmbeddedResource Include="..\HollywoodFX\Gore\GoreController.cs" Link="ProductionSource\GoreController.cs" />
+    <EmbeddedResource Include="..\HollywoodFX\ImpactController.cs" Link="ProductionSource\ImpactController.cs" />
+    <EmbeddedResource Include="..\HollywoodFX\Plugin.cs" Link="ProductionSource\Plugin.cs" />
   </ItemGroup>
 </Project>
