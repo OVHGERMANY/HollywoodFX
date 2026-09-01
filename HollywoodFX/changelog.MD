@@ -1,4 +1,8 @@
-﻿# 1.4.0
+﻿# 2.0.15
+* Rebuilt and validated against official SPT 4.1.3 (EFT 0.16.9.40743).
+* No gameplay behavior changes in this compatibility release.
+
+# 1.4.0
 * Overhauled blood & gore
   * Finisher effects for killshots
   * Bleed-like effects now get attached to the ragdoll
@@ -9,4 +13,4 @@
 * Removed blood effects appearing when the local player is shot at
 * Performance optimization and improvements across the board
 
-Thanks to Arttumiro, Soren and Devraccoon for testing and providing feedback, much appreciated! 
+Thanks to Arttumiro, Soren and Devraccoon for testing and providing feedback, much appreciated!

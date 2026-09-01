@@ -26,7 +26,7 @@ namespace HollywoodFX;
 public class Plugin : BaseUnityPlugin
 {
     public const string MajorMinorVersion = "2.0";
-    public const string HollywoodFXVersion = $"{MajorMinorVersion}.14";
+    public const string HollywoodFXVersion = $"{MajorMinorVersion}.15";
 
     public static ManualLogSource Log;
     public static BloodRenderOwnership BloodRenderOwnership { get; private set; } =

@@ -1,10 +1,10 @@
 # HollywoodFX
 
-HollywoodFX expands SPT's impact, explosion, muzzle, gore, ragdoll, and ambient combat effects. This branch targets the official SPT 4.1.2 client build; it is not built against a custom or ported EFT client.
+HollywoodFX expands SPT's impact, explosion, muzzle, gore, ragdoll, and ambient combat effects. This branch targets the official SPT 4.1.3 client build; it is not built against a custom or ported EFT client.
 
 ## Install
 
-Download the current release archive and extract it into the root of an official SPT 4.1.2 installation. The archive installs:
+Download the current release archive and extract it into the root of an official SPT 4.1.3 installation. The archive installs:
 
 - `BepInEx/plugins/HollywoodFX/HollywoodFX.dll`
 - `BepInEx/plugins/HollywoodFX/hollywoodfx`
@@ -21,7 +21,7 @@ dotnet run --project .\HollywoodFX.Validation\HollywoodFX.Validation.csproj --co
 
 ## Build
 
-Point the project at an official SPT 4.1.2 installation with either `SptRoot` or the `SPT_ROOT` environment variable:
+Point the project at an official SPT 4.1.3 installation with either `SptRoot` or the `SPT_ROOT` environment variable:
 
 ```powershell
 $env:SPT_ROOT = 'E:\Games\SPT'
@@ -36,7 +36,7 @@ dotnet build .\HollywoodFX\HollywoodFX.csproj --configuration Release --target:D
 
 ## Package
 
-The asset bundle is about 1 GB and is intentionally kept outside Git. The packaging script accepts the bundle from an installed copy, verifies the known v2.0.14 SHA-256, builds the DLL, and creates a deterministic release archive:
+The asset bundle is about 1 GB and is intentionally kept outside Git. The packaging script accepts the bundle from an installed copy, verifies its pinned SHA-256, builds the DLL, and creates the deterministic `HollywoodFX-2.0.15.zip` release archive:
 
 ```powershell
 .\scripts\New-ReleasePackage.ps1 -SptRoot 'E:\Games\SPT'

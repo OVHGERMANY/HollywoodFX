@@ -16,14 +16,14 @@ body:
     attributes:
       label: SPT version
       description: Use the exact version shown by the SPT launcher or server.
-      placeholder: 4.1.2
+      placeholder: 4.1.3
     validations:
       required: true
   - type: input
     id: mod-version
     attributes:
       label: HollywoodFX version
-      placeholder: 2.0.14
+      placeholder: 2.0.15
     validations:
       required: true
   - type: textarea

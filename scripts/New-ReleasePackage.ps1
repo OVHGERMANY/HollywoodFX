@@ -12,7 +12,7 @@ param(
     [string]$Configuration = 'Release',
 
     [ValidatePattern('^\d+\.\d+\.\d+$')]
-    [string]$Version = '2.0.14',
+    [string]$Version = '2.0.15',
 
     [ValidatePattern('^[A-Fa-f0-9]{64}$')]
     [string]$ExpectedBundleSha256 = 'A3531204B8E13DCEC7BBD0A403153D28D4570417D6CA7BC5B1959166B9562EC0'
