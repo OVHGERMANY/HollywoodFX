@@ -1,6 +1,10 @@
 ﻿# 2.0.15
+* Added character-attached impact marks and explicit character/corpse geometry policy.
+* Preserved independent impacts and replace stock decals only after a custom mark succeeds.
+* Added restrained blood presentation and TraumaCore blood-render ownership gates.
+* Added shot-lifecycle cleanup coverage and a portable 25-check validation suite.
 * Rebuilt and validated against official SPT 4.1.3 (EFT 0.16.9.40743).
-* No gameplay behavior changes in this compatibility release.
+* Offline validation is complete; in-game visual acceptance remains pending.
 
 # 1.4.0
 * Overhauled blood & gore
