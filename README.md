@@ -43,6 +43,7 @@ The asset bundle is about 1 GB and is intentionally kept outside Git. The packag
 ```
 
 Generated archives and checksum files are written under `artifacts/release/`, which Git ignores.
+Prerelease candidates use an explicit unique label, for example `-Version '2.0.16-rc.2'`.
 
 ## Bug reports
 

@@ -5,6 +5,8 @@
 * Penetration exits cannot repeat the full entry shower.
 * Centralized spark ownership prevents main-impact and tracer effects from stacking contact sparks.
 * Added smooth distance scaling, strict automatic-fire particle budgets, and bounded raid diagnostics.
+* RC2 hardening now uses raw incoming projectile energy, deterministic local sampling, and a fixed pellet/fragment family budget.
+* Particle leaves are selected by validated cached criteria and report one-time initialization metadata for runtime evidence.
 * No gameplay or ballistics behavior changes; the external asset bundle is unchanged.
 
 # 2.0.15

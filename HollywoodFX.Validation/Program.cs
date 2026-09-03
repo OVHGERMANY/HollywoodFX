@@ -57,7 +57,28 @@ var tests = new (string Name, Action Run)[]
     ("spark budget enforces the per-frame cap", SparkBudgetEnforcesPerFrameCap),
     ("spark rolling budget refills predictably", SparkRollingBudgetRefillsPredictably),
     ("spark emitter budgets one leaf particle system", SparkEmitterBudgetsOneLeafParticleSystem),
-    ("spark cleanup reports and resets raid state", SparkCleanupReportsAndResetsRaidState)
+    ("spark cleanup reports and resets raid state", SparkCleanupReportsAndResetsRaidState),
+    ("raw energy resolves 0.1 g at 400 m/s to 8 J", RawEnergyResolvesPointOneGram),
+    ("raw energy resolves 1.0 g at 400 m/s to 80 J", RawEnergyResolvesOneGram),
+    ("raw energy resolves 3.5 g at 400 m/s to 280 J", RawEnergyResolvesThreePointFiveGrams),
+    ("invalid raw energy inputs fail conservatively", InvalidRawEnergyInputsFailConservatively),
+    ("zero incoming energy cannot emit", ZeroIncomingEnergyCannotEmit),
+    ("low incoming energy gate is smooth and monotonic", LowIncomingEnergyGateIsSmoothAndMonotonic),
+    ("spark context has no legacy mass or energy fallback", SparkContextHasNoLegacyEnergyFallback),
+    ("eight pellet family obeys cluster caps", EightPelletFamilyObeysClusterCaps),
+    ("twelve pellet family obeys cluster caps", TwelvePelletFamilyObeysClusterCaps),
+    ("independent shots retain independent cluster budgets", IndependentShotsRetainIndependentClusterBudgets),
+    ("fragment family obeys cluster caps", FragmentFamilyObeysClusterCaps),
+    ("cluster window expires deterministically", ClusterWindowExpiresDeterministically),
+    ("active cluster survives an earlier expired slot", ActiveClusterSurvivesEarlierExpiredSlot),
+    ("cluster storage is fixed size value data", ClusterStorageIsFixedSizeValueData),
+    ("spark PRNG repeats the complete sample stream", SparkPrngRepeatsCompleteSampleStream),
+    ("spark PRNG varies with family and sequence", SparkPrngVariesWithFamilyAndSequence),
+    ("new spark path does not consume global randomness", NewSparkPathDoesNotConsumeGlobalRandomness),
+    ("shot family key uses verified EFT metadata", ShotFamilyKeyUsesVerifiedEftMetadata),
+    ("spark diagnostics cover hardening decisions", SparkDiagnosticsCoverHardeningDecisions),
+    ("particle leaf validation logs cached metadata", ParticleLeafValidationLogsCachedMetadata),
+    ("emission axis retains finite outward guard", EmissionAxisRetainsFiniteOutwardGuard)
 };
 
 var failures = 0;
@@ -832,11 +853,14 @@ static void SparkRollingBudgetRefillsPredictably()
 static void SparkEmitterBudgetsOneLeafParticleSystem()
 {
     var source = ReadEmbeddedSource("EffectBundle.cs");
-    Require(source.Contains("ResolveBallisticSystem(Main)", StringComparison.Ordinal),
+    Require(source.Contains("ResolveBallisticSystem(Main, effectKey)", StringComparison.Ordinal),
         "ballistic emission does not select a cached particle system");
-    Require(source.Contains("!mainSubEmitters.enabled || mainSubEmitters.subEmittersCount == 0", StringComparison.Ordinal) &&
-            source.Contains("!subEmitters.enabled || subEmitters.subEmittersCount == 0", StringComparison.Ordinal),
+    Require(source.Contains("renderer == null || !renderer.enabled", StringComparison.Ordinal) &&
+            source.Contains("subEmitters.enabled && subEmitters.subEmittersCount > 0", StringComparison.Ordinal),
         "ballistic emission can trigger an unbudgeted sub-emitter tree");
+    Require(source.Contains("ScoreBallisticCandidate", StringComparison.Ordinal) &&
+            source.Contains("string.CompareOrdinal(path, selectedPath)", StringComparison.Ordinal),
+        "multiple visible leaves are not resolved by stable cached criteria");
     Require(source.Contains("_ballisticSystem.Emit(emitParams, 1)", StringComparison.Ordinal),
         "ballistic emission no longer counts each emitted particle");
     Require(source.Contains("lights.enabled = false", StringComparison.Ordinal),
@@ -855,8 +879,289 @@ static void SparkCleanupReportsAndResetsRaidState()
         "spark state is not cleared before ImpactController release");
     Require(diagnosticsSource.Contains("spark-summary attempts=", StringComparison.Ordinal),
         "raid teardown no longer writes the bounded spark summary");
-    Require(diagnosticsSource.Contains("tracerDuplicatePrevented=", StringComparison.Ordinal),
-        "spark summary omitted tracer ownership diagnostics");
+    Require(!diagnosticsSource.Contains("tracerDuplicatePrevented=", StringComparison.Ordinal),
+        "diagnostics still claim every tracer prevented a duplicate");
+    var sparkEffectsSource = ReadEmbeddedSource("BallisticSparkEffects.cs");
+    Require(sparkEffectsSource.Contains("_clusterBudget.Reset()", StringComparison.Ordinal) &&
+            sparkEffectsSource.Contains("_impactSequence = 0", StringComparison.Ordinal),
+        "cluster or deterministic sequence state is not reset at raid disposal");
+}
+
+static void RawEnergyResolvesPointOneGram()
+{
+    Require(BallisticSparkEnergy.TryCalculateIncomingEnergy(0.1f, 400f, out var energy),
+        "valid pellet energy was rejected");
+    RequireNear(energy, 8f, 0.0001f, "0.1 g pellet energy");
+}
+
+static void RawEnergyResolvesOneGram()
+{
+    Require(BallisticSparkEnergy.TryCalculateIncomingEnergy(1f, 400f, out var energy),
+        "valid 1 g projectile energy was rejected");
+    RequireNear(energy, 80f, 0.0001f, "1.0 g projectile energy");
+}
+
+static void RawEnergyResolvesThreePointFiveGrams()
+{
+    Require(BallisticSparkEnergy.TryCalculateIncomingEnergy(3.5f, 400f, out var energy),
+        "valid 3.5 g projectile energy was rejected");
+    RequireNear(energy, 280f, 0.0001f, "3.5 g projectile energy");
+}
+
+static void InvalidRawEnergyInputsFailConservatively()
+{
+    foreach (var mass in new[] { -1f, 0f, float.NaN, float.PositiveInfinity, float.NegativeInfinity })
+    {
+        Require(!BallisticSparkEnergy.TryCalculateIncomingEnergy(mass, 400f, out var energy) && energy == 0f,
+            $"invalid mass {mass} produced energy");
+    }
+
+    foreach (var speed in new[] { -1f, float.NaN, float.PositiveInfinity, float.NegativeInfinity })
+    {
+        Require(!BallisticSparkEnergy.TryCalculateIncomingEnergy(1f, speed, out var energy) && energy == 0f,
+            $"invalid speed {speed} produced energy");
+    }
+
+    Require(!BallisticSparkEnergy.TryCalculateIncomingEnergy(float.MaxValue, float.MaxValue, out _),
+        "overflowing raw energy was accepted");
+}
+
+static void ZeroIncomingEnergyCannotEmit()
+{
+    Require(BallisticSparkEnergy.TryCalculateIncomingEnergy(1f, 0f, out var energy) && energy == 0f,
+        "stationary valid projectile did not resolve to zero energy");
+    var plan = CreateSparkPlan(BallisticSparkSurfaceClass.PrimaryMetal, BallisticSparkImpactState.Stopped, energy);
+    Require(!plan.ShouldAttemptEmission &&
+            plan.RejectionReason == BallisticSparkRejectionReason.NegligibleEnergy,
+        "zero incoming energy retained spark emission");
+}
+
+static void LowIncomingEnergyGateIsSmoothAndMonotonic()
+{
+    var previous = BallisticSparkPolicy.ResolveLowEnergyGate(
+        BallisticSparkPolicy.NegligibleEnergyThresholdJoules);
+    Require(previous == 0f, "low-energy gate did not start at zero");
+
+    for (var energy = BallisticSparkPolicy.NegligibleEnergyThresholdJoules + 0.1f;
+         energy <= BallisticSparkPolicy.LowEnergyFullResponseJoules;
+         energy += 0.1f)
+    {
+        var current = BallisticSparkPolicy.ResolveLowEnergyGate(energy);
+        Require(current + 0.000001f >= previous, $"low-energy gate fell at {energy:F2} J");
+        Require(current - previous < 0.02f, $"low-energy gate jumped at {energy:F2} J");
+        previous = current;
+    }
+
+    Require(BallisticSparkPolicy.ResolveLowEnergyGate(
+        BallisticSparkPolicy.LowEnergyFullResponseJoules) == 1f,
+        "low-energy gate did not reach full response");
+}
+
+static void SparkContextHasNoLegacyEnergyFallback()
+{
+    var source = ReadEmbeddedSource("BallisticSparkContextBuilder.cs");
+    Require(source.Contains("BallisticSparkEnergy.TryCalculateIncomingEnergy", StringComparison.Ordinal),
+        "runtime context does not calculate energy from raw impact data");
+    foreach (var forbidden in new[] { "kinetics.Bullet.Energy", "ResolveSparkEnergy", "/ 3.5f", "1620f" })
+        Require(!source.Contains(forbidden, StringComparison.Ordinal), $"runtime spark context retained {forbidden}");
+    Require(source.Contains("BallisticSparkEnergySource.RawIncomingImpactData", StringComparison.Ordinal),
+        "runtime context does not label the raw incoming energy source");
+}
+
+static void EightPelletFamilyObeysClusterCaps()
+{
+    VerifyClusterFamily(8, 0x8100UL, "eight-pellet shell");
+}
+
+static void TwelvePelletFamilyObeysClusterCaps()
+{
+    VerifyClusterFamily(12, 0x1212UL, "twelve-pellet shell");
+}
+
+static void IndependentShotsRetainIndependentClusterBudgets()
+{
+    var budget = new BallisticSparkClusterBudget();
+    var first = budget.Consume(true, 0x1111UL, 14, 2f);
+    var second = budget.Consume(true, 0x2222UL, 14, 2f);
+    Require(first.AllowedParticles == 14 && second.AllowedParticles == 14,
+        "independent family keys shared one cluster budget in the same frame");
+}
+
+static void FragmentFamilyObeysClusterCaps()
+{
+    VerifyClusterFamily(16, 0xF12A6UL, "fragment family");
+}
+
+static void ClusterWindowExpiresDeterministically()
+{
+    var budget = new BallisticSparkClusterBudget();
+    var key = 0xCAFEUL;
+    Require(budget.Consume(true, key, 14, 1f).AllowedParticles == 14, "first cluster event was rejected");
+    Require(budget.Consume(true, key, 14, 1.01f).AllowedParticles == 4,
+        "second cluster event did not consume the remaining particle allowance");
+    Require(budget.Consume(true, key, 14, 1.02f).AllowedParticles == 0,
+        "cluster event cap did not suppress the third event");
+    Require(budget.Consume(true, key, 14,
+                1f + BallisticSparkClusterBudget.ClusterWindowSeconds + 0.001f).AllowedParticles == 14,
+        "expired cluster window did not start a new allowance");
+}
+
+static void ActiveClusterSurvivesEarlierExpiredSlot()
+{
+    var budget = new BallisticSparkClusterBudget();
+    Require(budget.Consume(true, 0x10UL, 14, 0f).AllowedParticles == 14,
+        "first slot setup failed");
+    Require(budget.Consume(true, 0x20UL, 14, 1f).AllowedParticles == 14,
+        "active family setup failed");
+    Require(budget.Consume(true, 0x20UL, 14, 1.01f).AllowedParticles == 4,
+        "expired earlier slot hid the active matching family");
+}
+
+static void ClusterStorageIsFixedSizeValueData()
+{
+    var source = ReadEmbeddedSource("BallisticSparkClusterBudget.cs");
+    Require(source.Contains("new Slot[SlotCount]", StringComparison.Ordinal),
+        "cluster budget does not use a fixed slot array");
+    Require(source.Contains("private struct Slot", StringComparison.Ordinal),
+        "cluster slot is not value data");
+    foreach (var forbidden in new[] { "Dictionary<", "List<", "Shot ", "Player ", "Collider", "Transform" })
+        Require(!source.Contains(forbidden, StringComparison.Ordinal), $"cluster budget retains forbidden {forbidden}");
+}
+
+static void SparkPrngRepeatsCompleteSampleStream()
+{
+    var first = BuildDeterministicSparkSample(0xA55AUL, 7U);
+    var second = BuildDeterministicSparkSample(0xA55AUL, 7U);
+    Require(first.SequenceEqual(second), "identical family and sequence changed the spark sample stream");
+}
+
+static void SparkPrngVariesWithFamilyAndSequence()
+{
+    var baseline = BuildDeterministicSparkSample(0xA55AUL, 7U);
+    Require(!baseline.SequenceEqual(BuildDeterministicSparkSample(0xA55BUL, 7U)),
+        "different shot family produced the same spark sample stream");
+    Require(!baseline.SequenceEqual(BuildDeterministicSparkSample(0xA55AUL, 8U)),
+        "different impact sequence produced the same spark sample stream");
+}
+
+static void NewSparkPathDoesNotConsumeGlobalRandomness()
+{
+    var effectsSource = ReadEmbeddedSource("BallisticSparkEffects.cs");
+    Require(!effectsSource.Contains("UnityEngine.Random", StringComparison.Ordinal) &&
+            !effectsSource.Contains("Random.", StringComparison.Ordinal) &&
+            !effectsSource.Contains("System.Random", StringComparison.Ordinal),
+        "ballistic spark owner still consumes global or allocated randomness");
+
+    var bundleSource = ReadEmbeddedSource("EffectBundle.cs");
+    var ballisticStart = bundleSource.IndexOf("public int EmitBallistic(", StringComparison.Ordinal);
+    var ballisticEnd = bundleSource.IndexOf("public bool PrepareBallistic", ballisticStart, StringComparison.Ordinal);
+    Require(ballisticStart >= 0 && ballisticEnd > ballisticStart, "ballistic emitter method could not be isolated");
+    var ballisticEmitter = bundleSource.Substring(ballisticStart, ballisticEnd - ballisticStart);
+    Require(ballisticEmitter.Contains("ref BallisticSparkPrng random", StringComparison.Ordinal) &&
+            !ballisticEmitter.Contains("Random.", StringComparison.Ordinal),
+        "ballistic emitter does not exclusively use the local PRNG state");
+}
+
+static void ShotFamilyKeyUsesVerifiedEftMetadata()
+{
+    var source = ReadEmbeddedSource("BallisticSparkContextBuilder.cs");
+    foreach (var required in new[]
+             {
+                 "shot.FireIndex", "shot.PlayerProfileID", "shot.Weapon?.Id", "shot.Ammo?.StringTemplateId",
+                 "shot.MasterOrigin", "shot.FragmentIndex", "ProjectileCount"
+             })
+    {
+        Require(source.Contains(required, StringComparison.Ordinal), $"shot family key omitted {required}");
+    }
+    var clusterSource = ReadEmbeddedSource("BallisticSparkClusterBudget.cs");
+    Require(source.Contains("FallbackClusterCellMetres", StringComparison.Ordinal) &&
+            clusterSource.Contains("ClusterWindowSeconds", StringComparison.Ordinal),
+        "invalid family identity has no bounded spatial-temporal fallback");
+}
+
+static void SparkDiagnosticsCoverHardeningDecisions()
+{
+    var source = ReadEmbeddedSource("BallisticSparkDiagnostics.cs");
+    foreach (var required in new[]
+             {
+                 "negligibleEnergyRejected=", "invalidRawEnergy=", "rawEnergyFallback=0", "clusterReduced=",
+                 "clusterParticlesRejected=", "clusterEventsRejected=", "selectedProfiles=",
+                 "missingOrInvalidParticleLeaves=", "emittedBySurface=", "spark-detail material=",
+                 "incomingEnergyJ=", "energySource=", "directionSource=Shot.CurrentDirection",
+                 "incomingDirectionCandidate=", "clusterAllowed=", "globalAllowed=", "particleSystem="
+             })
+    {
+        Require(source.Contains(required, StringComparison.Ordinal), $"spark diagnostics omitted {required}");
+    }
+    Require(source.Contains("if (value < long.MaxValue)", StringComparison.Ordinal),
+        "diagnostic counters can wrap instead of saturating");
+}
+
+static void ParticleLeafValidationLogsCachedMetadata()
+{
+    var source = ReadEmbeddedSource("EffectBundle.cs");
+    foreach (var required in new[]
+             {
+                 "ballistic-spark-leaf effect=", "particleSystem=", "path=", "rendererEnabled=",
+                 "simulationSpace=", "scalingMode=", "startSize=", "startSpeed=", "startLifetime=",
+                 "trails=", "particleLight=", "subEmitters="
+             })
+    {
+        Require(source.Contains(required, StringComparison.Ordinal), $"particle-leaf validation omitted {required}");
+    }
+    Require(source.Contains("if (_ballisticPrepared)", StringComparison.Ordinal),
+        "particle-leaf inspection is not cached at initialization");
+}
+
+static void EmissionAxisRetainsFiniteOutwardGuard()
+{
+    var source = ReadEmbeddedSource("BallisticSparkContextBuilder.cs");
+    Require(source.Contains("var normalComponent = Vector3.Dot(axis, context.Normal)", StringComparison.Ordinal) &&
+            source.Contains("if (normalComponent < 0f)", StringComparison.Ordinal) &&
+            source.Contains("return TryNormalize(axis, out axis) ? axis : context.Normal", StringComparison.Ordinal),
+        "final spark axis can become non-finite or point into the struck surface");
+}
+
+static void VerifyClusterFamily(int projectileCount, ulong key, string label)
+{
+    var budget = new BallisticSparkClusterBudget();
+    var emittedEvents = 0;
+    var emittedParticles = 0;
+    var rejectedEvents = 0;
+    for (var index = 0; index < projectileCount; index++)
+    {
+        var allowance = budget.Consume(true, key, 14, 5f + index * 0.001f);
+        if (allowance.AllowedParticles > 0)
+            emittedEvents++;
+        if (allowance.EventRejected)
+            rejectedEvents++;
+        emittedParticles += allowance.AllowedParticles;
+    }
+
+    Require(emittedEvents == BallisticSparkClusterBudget.PerClusterEventCap,
+        $"{label} emitted {emittedEvents} visible events");
+    Require(emittedParticles == BallisticSparkClusterBudget.PerClusterParticleCap,
+        $"{label} emitted {emittedParticles} particles");
+    Require(rejectedEvents == projectileCount - BallisticSparkClusterBudget.PerClusterEventCap,
+        $"{label} did not gracefully suppress later impacts");
+}
+
+static uint[] BuildDeterministicSparkSample(ulong familyKey, uint impactSequence)
+{
+    var seed = BallisticSparkSeed.Add(BallisticSparkSeed.OffsetBasis, familyKey);
+    seed = BallisticSparkSeed.Add(seed, impactSequence);
+    var random = new BallisticSparkPrng(seed);
+    return
+    [
+        random.NextUInt(), // eligibility
+        (uint)random.NextInt(2, 15), // requested count
+        (uint)random.NextInt(0, 4), // bundle emitter
+        random.NextUInt(), // cone x
+        random.NextUInt(), // cone y
+        random.NextUInt(), // cone z
+        random.NextUInt(), // speed
+        random.NextUInt() // lifetime
+    ];
 }
 
 static BallisticSparkPlan CreateSparkPlan(

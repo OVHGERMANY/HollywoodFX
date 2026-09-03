@@ -5,6 +5,8 @@ public enum BallisticSparkRejectionReason
     None,
     Disabled,
     InvalidGeometry,
+    InvalidRawEnergy,
+    NegligibleEnergy,
     Material,
     Distance,
     NoParticles

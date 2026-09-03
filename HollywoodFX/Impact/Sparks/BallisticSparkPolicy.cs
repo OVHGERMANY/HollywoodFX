@@ -6,6 +6,8 @@ public static class BallisticSparkPolicy
 {
     public const int PerImpactParticleCap = 24;
     public const float DefaultMaximumDistance = 140f;
+    public const float NegligibleEnergyThresholdJoules = 0.25f;
+    public const float LowEnergyFullResponseJoules = 12f;
 
     public static BallisticSparkPlan CreatePlan(
         BallisticSparkSurfaceClass surface,
@@ -19,11 +21,17 @@ public static class BallisticSparkPolicy
         float maximumDistance,
         bool geometryIsValid)
     {
-        if (!geometryIsValid || !IsFinite(kineticEnergyJoules) || !IsFinite(chanceScale) ||
-            !IsFinite(normalIncidenceCosine) || !IsFinite(distanceMetres))
+        if (!geometryIsValid || !IsFinite(chanceScale) || !IsFinite(normalIncidenceCosine) ||
+            !IsFinite(distanceMetres))
         {
             return BallisticSparkPlan.Reject(impactState, BallisticSparkRejectionReason.InvalidGeometry);
         }
+
+        if (!IsFinite(kineticEnergyJoules) || kineticEnergyJoules < 0f)
+            return BallisticSparkPlan.Reject(impactState, BallisticSparkRejectionReason.InvalidRawEnergy);
+
+        if (kineticEnergyJoules <= NegligibleEnergyThresholdJoules)
+            return BallisticSparkPlan.Reject(impactState, BallisticSparkRejectionReason.NegligibleEnergy);
 
         if (!IsFinite(intensity) || intensity <= 0f)
             return BallisticSparkPlan.Reject(impactState, BallisticSparkRejectionReason.Disabled);
@@ -35,9 +43,10 @@ public static class BallisticSparkPolicy
         if (distanceAttenuation <= 0f)
             return BallisticSparkPlan.Reject(impactState, BallisticSparkRejectionReason.Distance);
 
-        var energy = Math.Max(0f, kineticEnergyJoules);
+        var energy = kineticEnergyJoules;
         var energyResponse = (float)Math.Sqrt(energy / (energy + 700f));
-        var energyCountScale = 0.25f + 0.75f * energyResponse;
+        var lowEnergyGate = ResolveLowEnergyGate(energy);
+        var energyCountScale = (0.25f + 0.75f * energyResponse) * lowEnergyGate;
         var boundedChanceScale = Clamp(chanceScale, 0.4f, 1.35f);
         var boundedIntensity = Clamp(intensity, 0f, 2f);
         var grazingAmount = 1f - Clamp(normalIncidenceCosine, 0f, 1f);
@@ -60,7 +69,7 @@ public static class BallisticSparkPolicy
             : 0.85f + 0.15f * (1f - grazingAmount);
         var probability = Lerp(profile.MinimumProbability, profile.MaximumProbability, energyResponse) *
                           boundedChanceScale * boundedIntensity * distanceAttenuation *
-                          probabilityScale * angleProbabilityScale;
+                          probabilityScale * angleProbabilityScale * lowEnergyGate;
         probability = Clamp(probability, 0f, 0.95f);
 
         var countIntensity = boundedIntensity <= 1f
@@ -122,6 +131,21 @@ public static class BallisticSparkPolicy
         var transition = Clamp((normalizedDistance - 0.2f) / 0.8f, 0f, 1f);
         var smoothStep = transition * transition * (3f - 2f * transition);
         return 1f - smoothStep;
+    }
+
+    public static float ResolveLowEnergyGate(float incomingEnergyJoules)
+    {
+        if (!IsFinite(incomingEnergyJoules) || incomingEnergyJoules <= NegligibleEnergyThresholdJoules)
+            return 0f;
+        if (incomingEnergyJoules >= LowEnergyFullResponseJoules)
+            return 1f;
+
+        var transition = Clamp(
+            (incomingEnergyJoules - NegligibleEnergyThresholdJoules) /
+            (LowEnergyFullResponseJoules - NegligibleEnergyThresholdJoules),
+            0f,
+            1f);
+        return transition * transition * (3f - 2f * transition);
     }
 
     private static int ResolveStateCap(

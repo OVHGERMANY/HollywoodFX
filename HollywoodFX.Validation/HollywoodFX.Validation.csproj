@@ -16,6 +16,9 @@
     <Compile Include="..\HollywoodFX\Gore\GoreEligibilityPolicy.cs" Link="Production\GoreEligibilityPolicy.cs" />
     <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkSurfaceClass.cs" Link="Production\Sparks\BallisticSparkSurfaceClass.cs" />
     <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkImpactState.cs" Link="Production\Sparks\BallisticSparkImpactState.cs" />
+    <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkEnergy.cs" Link="Production\Sparks\BallisticSparkEnergy.cs" />
+    <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkPrng.cs" Link="Production\Sparks\BallisticSparkPrng.cs" />
+    <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkClusterBudget.cs" Link="Production\Sparks\BallisticSparkClusterBudget.cs" />
     <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkProfile.cs" Link="Production\Sparks\BallisticSparkProfile.cs" />
     <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkPlan.cs" Link="Production\Sparks\BallisticSparkPlan.cs" />
     <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkPolicy.cs" Link="Production\Sparks\BallisticSparkPolicy.cs" />
@@ -34,6 +37,7 @@
     <EmbeddedResource Include="..\HollywoodFX\Impact\Sparks\BallisticSparkContextBuilder.cs" Link="ProductionSource\BallisticSparkContextBuilder.cs" />
     <EmbeddedResource Include="..\HollywoodFX\Impact\Sparks\BallisticSparkEffects.cs" Link="ProductionSource\BallisticSparkEffects.cs" />
     <EmbeddedResource Include="..\HollywoodFX\Impact\Sparks\BallisticSparkDiagnostics.cs" Link="ProductionSource\BallisticSparkDiagnostics.cs" />
+    <EmbeddedResource Include="..\HollywoodFX\Impact\Sparks\BallisticSparkClusterBudget.cs" Link="ProductionSource\BallisticSparkClusterBudget.cs" />
     <EmbeddedResource Include="..\HollywoodFX\Particles\EffectBundle.cs" Link="ProductionSource\EffectBundle.cs" />
     <EmbeddedResource Include="..\HollywoodFX\Patches\Dispose.cs" Link="ProductionSource\Dispose.cs" />
     <EmbeddedResource Include="..\HollywoodFX\Patches\Effects.cs" Link="ProductionSource\Effects.cs" />
