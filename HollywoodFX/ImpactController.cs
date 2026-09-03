@@ -80,4 +80,9 @@ internal class ImpactController
         if (kinetics.IsHitPointVisible || kinetics.DistanceToImpact < Plugin.AmbientSimulationRange.Value)
             _battleAmbience.Emit(kinetics, isBodyShot ? 0.3f : 0.6f);
     }
+
+    public void Dispose()
+    {
+        _impactEffects.Dispose();
+    }
 }

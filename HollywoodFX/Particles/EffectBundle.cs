@@ -9,13 +9,28 @@ namespace HollywoodFX.Particles;
 
 public class Emitter
 {
+    private const float MaximumBallisticLifetimeSeconds = 0.9f;
     public readonly ParticleSystem Main;
     private readonly List<SubEmitter> _emitters;
+    private readonly ParticleSystem _ballisticSystem;
+    private readonly Transform _ballisticTransform;
+    private readonly ParticleSystem.MinMaxCurve _startSpeed;
+    private readonly ParticleSystem.MinMaxCurve _startLifetime;
+    private readonly ParticleSystemSimulationSpace _simulationSpace;
+    private readonly Transform _customSimulationSpace;
 
     public Emitter(ParticleSystem main)
     {
         Main = main;
         _emitters = [];
+
+        _ballisticSystem = ResolveBallisticSystem(Main);
+        _ballisticTransform = _ballisticSystem.transform;
+        var mainModule = _ballisticSystem.main;
+        _startSpeed = mainModule.startSpeed;
+        _startLifetime = mainModule.startLifetime;
+        _simulationSpace = mainModule.simulationSpace;
+        _customSimulationSpace = mainModule.customSimulationSpace;
 
         BuildEmitters();
     }
@@ -66,6 +81,117 @@ public class Emitter
         Main.transform.rotation = rotation;
 
         Main.Emit(count);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public int EmitBallistic(
+        Vector3 position,
+        Vector3 surfaceNormal,
+        Vector3 axis,
+        float scale,
+        int count,
+        float velocityMultiplier,
+        float lifetimeMultiplier,
+        float spreadDegrees)
+    {
+        if (count <= 0)
+            return 0;
+
+        _ballisticTransform.position = position;
+        _ballisticTransform.localScale = new Vector3(scale, scale, scale);
+        _ballisticTransform.rotation = Quaternion.LookRotation(axis);
+
+        var spreadScale = Mathf.Tan(Mathf.Clamp(spreadDegrees, 0f, 75f) * Mathf.Deg2Rad);
+        for (var i = 0; i < count; i++)
+        {
+            var random = Random.insideUnitSphere;
+            var perpendicular = random - axis * Vector3.Dot(random, axis);
+            var direction = axis + perpendicular * spreadScale;
+            if (direction.sqrMagnitude < 0.000001f)
+                direction = axis;
+            else
+                direction.Normalize();
+
+            var normalComponent = Vector3.Dot(direction, surfaceNormal);
+            if (normalComponent < 0f)
+            {
+                direction -= surfaceNormal * normalComponent;
+                if (direction.sqrMagnitude < 0.000001f)
+                    direction = surfaceNormal;
+                else
+                    direction.Normalize();
+            }
+
+            var worldVelocity = direction * Mathf.Max(0f, Sample(_startSpeed) * velocityMultiplier);
+            var emitParams = new ParticleSystem.EmitParams
+            {
+                velocity = ToSimulationVelocity(worldVelocity),
+                startLifetime = Mathf.Clamp(
+                    Sample(_startLifetime) * lifetimeMultiplier,
+                    0.03f,
+                    MaximumBallisticLifetimeSeconds)
+            };
+            _ballisticSystem.Emit(emitParams, 1);
+        }
+
+        return count;
+    }
+
+    public void PrepareBallistic()
+    {
+        var lights = _ballisticSystem.lights;
+        lights.enabled = false;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private Vector3 ToSimulationVelocity(Vector3 worldVelocity)
+    {
+        if (_simulationSpace == ParticleSystemSimulationSpace.World)
+            return worldVelocity;
+        if (_simulationSpace == ParticleSystemSimulationSpace.Custom && _customSimulationSpace != null)
+            return _customSimulationSpace.InverseTransformDirection(worldVelocity);
+        return _ballisticTransform.InverseTransformDirection(worldVelocity);
+    }
+
+    private static ParticleSystem ResolveBallisticSystem(ParticleSystem main)
+    {
+        var mainSubEmitters = main.subEmitters;
+        if (!mainSubEmitters.enabled || mainSubEmitters.subEmittersCount == 0)
+            return main;
+
+        var systems = main.GetComponentsInChildren<ParticleSystem>(true);
+        for (var i = 0; i < systems.Length; i++)
+        {
+            var subEmitters = systems[i].subEmitters;
+            if (!subEmitters.enabled || subEmitters.subEmittersCount == 0)
+                return systems[i];
+        }
+
+        return main;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static float Sample(ParticleSystem.MinMaxCurve curve)
+    {
+        switch (curve.mode)
+        {
+            case ParticleSystemCurveMode.Constant:
+                return curve.constant;
+            case ParticleSystemCurveMode.TwoConstants:
+                return Random.Range(curve.constantMin, curve.constantMax);
+            case ParticleSystemCurveMode.Curve:
+                return curve.curve == null ? curve.constant : curve.curve.Evaluate(Random.value) * curve.curveMultiplier;
+            case ParticleSystemCurveMode.TwoCurves:
+                if (curve.curveMin == null || curve.curveMax == null)
+                    return Random.Range(curve.constantMin, curve.constantMax);
+                var time = Random.value;
+                return Mathf.Lerp(
+                    curve.curveMin.Evaluate(time),
+                    curve.curveMax.Evaluate(time),
+                    Random.value) * curve.curveMultiplier;
+            default:
+                return curve.constant;
+        }
     }
 
     public void ScaleDensity(float density)
@@ -164,6 +290,31 @@ public class EffectBundle(Emitter[] emitters)
     {
         var pick = Emitters.Length == 1 ? Emitters[0] : Emitters[Random.Range(0, Emitters.Length)];
         pick.EmitDirect(position, normal, scale, count);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public int EmitBallistic(
+        Vector3 position,
+        Vector3 surfaceNormal,
+        Vector3 axis,
+        float scale,
+        int count,
+        float velocityMultiplier,
+        float lifetimeMultiplier,
+        float spreadDegrees)
+    {
+        if (Emitters.Length == 0)
+            return 0;
+
+        var pick = Emitters.Length == 1 ? Emitters[0] : Emitters[Random.Range(0, Emitters.Length)];
+        return pick.EmitBallistic(position, surfaceNormal, axis, scale, count, velocityMultiplier,
+            lifetimeMultiplier, spreadDegrees);
+    }
+
+    public void PrepareBallistic()
+    {
+        for (var i = 0; i < Emitters.Length; i++)
+            Emitters[i].PrepareBallistic();
     }
 
     public void Shuffle(int count = 0)

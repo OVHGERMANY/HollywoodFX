@@ -23,7 +23,7 @@ body:
     id: mod-version
     attributes:
       label: HollywoodFX version
-      placeholder: 2.0.15
+      placeholder: 2.0.16
     validations:
       required: true
   - type: textarea

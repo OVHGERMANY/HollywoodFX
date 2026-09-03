@@ -26,7 +26,7 @@ namespace HollywoodFX;
 public class Plugin : BaseUnityPlugin
 {
     public const string MajorMinorVersion = "2.0";
-    public const string HollywoodFXVersion = $"{MajorMinorVersion}.15";
+    public const string HollywoodFXVersion = $"{MajorMinorVersion}.16";
 
     public static ManualLogSource Log;
     public static BloodRenderOwnership BloodRenderOwnership { get; private set; } =
@@ -34,6 +34,9 @@ public class Plugin : BaseUnityPlugin
 
     public static ConfigEntry<float> EffectSize;
     public static ConfigEntry<bool> TracerImpactsEnabled;
+    public static ConfigEntry<bool> BallisticImpactSparksEnabled;
+    public static ConfigEntry<float> BallisticImpactSparkIntensity;
+    public static ConfigEntry<float> BallisticImpactSparkMaximumDistance;
 
     public static ConfigEntry<bool> BulletHoleScalingEnabled;
     public static ConfigEntry<float> BulletHoleSize;
@@ -364,6 +367,22 @@ public class Plugin : BaseUnityPlugin
             "Width multiplier for ricochet scrape marks. Values below 0.35 are kept readable at 0.35 internally.",
             new AcceptableValueRange<float>(0.05f, 1f),
             new ConfigurationManagerAttributes { Order = 9 }
+        ));
+
+        BallisticImpactSparksEnabled = Config.Bind(impacts, "Enable Ballistic Impact Sparks", true, new ConfigDescription(
+            "Enables the material-, energy-, angle-, and impact-state-aware contact spark system.",
+            null,
+            new ConfigurationManagerAttributes { Order = 18 }
+        ));
+        BallisticImpactSparkIntensity = Config.Bind(impacts, "Ballistic Impact Spark Intensity", 1f, new ConfigDescription(
+            "Scales spark probability and particle count without enlarging the particles.",
+            new AcceptableValueRange<float>(0f, 2f),
+            new ConfigurationManagerAttributes { Order = 17 }
+        ));
+        BallisticImpactSparkMaximumDistance = Config.Bind(impacts, "Ballistic Impact Spark Maximum Distance", 140f, new ConfigDescription(
+            "Suppresses contact sparks beyond this distance in metres and smoothly reduces them as they approach the limit.",
+            new AcceptableValueRange<float>(25f, 250f),
+            new ConfigurationManagerAttributes { Order = 16, IsAdvanced = true }
         ));
 
         EffectSize = Config.Bind(impacts, "Impact Effect Size", 0.75f, new ConfigDescription(
