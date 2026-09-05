@@ -91,7 +91,7 @@ internal sealed class BallisticSparkEffects
         if (requested <= 0)
             return;
 
-        var clusterAllowance = _clusterBudget.Consume(
+        var clusterAllowance = _clusterBudget.Preview(
             context.UsesClusterBudget,
             clusterKey,
             requested,
@@ -131,6 +131,9 @@ internal sealed class BallisticSparkEffects
             ref random,
             out var emitterName,
             out var particleSystemName);
+        // Charge the family only after submission. Global throttling, a full leaf,
+        // or an invalid particle must not spend its two visible events for nothing.
+        _clusterBudget.Consume(context.UsesClusterBudget, clusterKey, emitted, now);
         if (emitted <= 0 && particleSystemName == "<none>")
             _diagnostics.RecordMissingOrInvalidParticleLeaves(1);
         _diagnostics.RecordEmission(context.Surface, emitted);

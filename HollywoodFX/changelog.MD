@@ -1,3 +1,11 @@
+# 2.0.18
+* Added restrained realism-oriented defaults while retaining all existing controls and saved settings.
+* Anchored ballistic spark particles to the impact point with independent world-space size, velocity and local seeds.
+* Replaced flattened grazing sprays with bounded outward cone sampling.
+* Fixed active-family eviction under saturation and duplicate refill after a backwards clock value.
+* Charge pellet/fragment families only for submitted particles; cache diagnostic names outside the impact hot path.
+* Added geometry, budget-model, allocation, default-binding and runtime-wiring regressions. User-observed metal, concrete, soft-surface and automatic-fire checks passed; see the release notes for remaining untested cases.
+
 # 2.0.17
 * Targeted official SPT 4.1.4 (build 072d534, EFT 0.16.9.5.40743) and rebuilt against its patched game assembly and client modules.
 * Audited the 4.1.4 serialized-field changes and muzzle reflection lookups; no effect behavior change or asset-bundle rebuild was needed.

@@ -84,7 +84,6 @@ internal readonly struct BallisticSparkRuntimeContext
 
 internal static class BallisticSparkContextBuilder
 {
-    private const float MinimumVectorSqrMagnitude = 0.000001f;
     private const float SizeNormFactor = 2000f;
     private const float FallbackClusterCellMetres = 0.75f;
 
@@ -315,14 +314,15 @@ internal static class BallisticSparkContextBuilder
 
     private static bool TryNormalize(Vector3 value, out Vector3 normalized)
     {
-        if (!IsFinite(value) || value.sqrMagnitude < MinimumVectorSqrMagnitude)
+        if (!BallisticSparkEmissionFrame.TryNormalize(
+                new System.Numerics.Vector3(value.x, value.y, value.z), out var unit))
         {
             normalized = default;
             return false;
         }
 
-        normalized = value.normalized;
-        return IsFinite(normalized);
+        normalized = new Vector3(unit.X, unit.Y, unit.Z);
+        return true;
     }
 
     private static bool IsFinite(Vector3 value)

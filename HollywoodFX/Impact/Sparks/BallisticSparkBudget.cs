@@ -30,7 +30,7 @@ public sealed class BallisticSparkBudget
         {
             var elapsed = Math.Max(0f, unscaledTime - _lastTime);
             _available = Math.Min(RollingCapacity, _available + elapsed * RollingRefillPerSecond);
-            _lastTime = unscaledTime;
+            _lastTime = Math.Max(_lastTime, unscaledTime);
         }
 
         if (_frame != frame)

@@ -79,11 +79,15 @@ var tests = new (string Name, Action Run)[]
     ("spark diagnostics cover hardening decisions", SparkDiagnosticsCoverHardeningDecisions),
     ("particle leaf validation logs cached metadata", ParticleLeafValidationLogsCachedMetadata),
     ("emission axis retains finite outward guard", EmissionAxisRetainsFiniteOutwardGuard),
-    ("SPT 4.1.4 release metadata stays aligned", Spt414ReleaseMetadataStaysAligned)
+    ("SPT 4.1.4 release metadata stays aligned", Spt414ReleaseMetadataStaysAligned),
+    ("saturated cluster storage preserves active families", SaturatedClusterStoragePreservesActiveFamilies),
+    ("cluster storage rejects overflow until expiry", ClusterStorageRejectsOverflowUntilExpiry),
+    ("clock regression cannot refill the rolling budget twice", ClockRegressionCannotRefillBudgetTwice)
 };
 
 var failures = 0;
-foreach (var test in tests)
+var allTests = tests.Concat(SparkRefinementTests.All).ToArray();
+foreach (var test in allTests)
 {
     try
     {
@@ -97,7 +101,7 @@ foreach (var test in tests)
     }
 }
 
-Console.WriteLine($"{tests.Length - failures}/{tests.Length} tests passed");
+Console.WriteLine($"{allTests.Length - failures}/{allTests.Length} tests passed");
 return failures == 0 ? 0 : 1;
 
 static void ConfirmedPenetrationCreatesPair()
@@ -724,13 +728,16 @@ static void GenericArmorProfilesStayConservative()
 static void SparkConfigurationIsFocusedAndLive()
 {
     var source = ReadEmbeddedSource("Plugin.cs");
-    Require(source.Contains("HollywoodFXVersion = $\"{MajorMinorVersion}.17\"", StringComparison.Ordinal),
-        "plugin version is not 2.0.17");
+    Require(source.Contains("HollywoodFXVersion = $\"{MajorMinorVersion}.18\"", StringComparison.Ordinal),
+        "plugin version is not 2.0.18");
+    Require(source.Contains("BuildVersion = HollywoodFXVersion;", StringComparison.Ordinal) &&
+            ReadEmbeddedSource("AssemblyInfo.cs").Contains("AssemblyInformationalVersion(Plugin.BuildVersion)", StringComparison.Ordinal),
+        "build identity does not match the final release");
     Require(source.Contains("MajorMinorVersion = \"2.0\"", StringComparison.Ordinal),
         "minor update changed the configuration compatibility version");
     Require(source.Contains("\"Enable Ballistic Impact Sparks\", true", StringComparison.Ordinal),
         "spark enable control or default changed");
-    Require(source.Contains("\"Ballistic Impact Spark Intensity\", 1f", StringComparison.Ordinal) &&
+    Require(source.Contains("\"Ballistic Impact Spark Intensity\", RealismDefaults.SparkIntensity", StringComparison.Ordinal) &&
             source.Contains("new AcceptableValueRange<float>(0f, 2f)", StringComparison.Ordinal),
         "spark intensity default or range changed");
     Require(source.Contains("\"Ballistic Impact Spark Maximum Distance\", 140f", StringComparison.Ordinal) &&
@@ -742,7 +749,7 @@ static void PotatoTemplateReducesSparkLoad()
 {
     var source = ReadEmbeddedSource("ConfigurationTemplates.cs");
     Require(source.Contains("BallisticImpactSparkIntensity.Value = 0.5f", StringComparison.Ordinal),
-        "Potato template does not halve spark intensity");
+        "Potato template does not keep spark intensity below the realism default");
     Require(source.Contains("BallisticImpactSparkMaximumDistance.Value = 90f", StringComparison.Ordinal),
         "Potato template does not reduce spark distance");
 }
@@ -1029,6 +1036,37 @@ static void ClusterStorageIsFixedSizeValueData()
         Require(!source.Contains(forbidden, StringComparison.Ordinal), $"cluster budget retains forbidden {forbidden}");
 }
 
+static void SaturatedClusterStoragePreservesActiveFamilies()
+{
+    var budget = new BallisticSparkClusterBudget();
+    for (ulong key = 1; key <= BallisticSparkClusterBudget.SlotCount; key++)
+        Require(budget.Consume(true, key, 18, 1f).AllowedParticles == 18, "slot setup failed");
+    budget.Consume(true, 1000UL, 18, 1.01f);
+    var repeated = budget.Consume(true, 1UL, 18, 1.02f).AllowedParticles;
+    Require(repeated == 0, $"overflow evicted active family: it received {18 + repeated}/18 particles");
+}
+
+static void ClusterStorageRejectsOverflowUntilExpiry()
+{
+    var budget = new BallisticSparkClusterBudget();
+    for (ulong key = 1; key <= BallisticSparkClusterBudget.SlotCount; key++)
+        budget.Consume(true, key, 1, 1f);
+    Require(budget.Consume(true, 1000UL, 1, 1.01f).AllowedParticles == 0,
+        "full storage must fail closed, not erase an active family's limit");
+    Require(budget.Consume(true, 1000UL, 1, 1.181f).AllowedParticles == 1,
+        "expired storage did not recover");
+}
+
+static void ClockRegressionCannotRefillBudgetTwice()
+{
+    var budget = new BallisticSparkBudget();
+    for (var frame = 0; frame < 8; frame++)
+        budget.Consume(24, 10f, frame);
+    Require(budget.Consume(24, 9f, 9) == 0, "backwards time refilled an empty budget");
+    var allowed = budget.Consume(24, 10f, 10);
+    Require(allowed == 0, $"revisiting the same timestamp granted {allowed} extra particles");
+}
+
 static void SparkPrngRepeatsCompleteSampleStream()
 {
     var first = BuildDeterministicSparkSample(0xA55AUL, 7U);
@@ -1205,18 +1243,18 @@ static void Require(bool condition, string message)
 
 static void Spt414ReleaseMetadataStaysAligned()
 {
-    Require(ReadEmbeddedSource("New-ReleasePackage.ps1").Contains("$Version = '2.0.17'", StringComparison.Ordinal),
+    Require(ReadEmbeddedSource("New-ReleasePackage.ps1").Contains("$Version = '2.0.18'", StringComparison.Ordinal),
         "package default does not match the plugin release");
     Require(ReadEmbeddedSource("HollywoodFX.csproj").Contains("official SPT 4.1.4 path", StringComparison.Ordinal),
         "build instructions do not target SPT 4.1.4");
     var readme = ReadEmbeddedSource("README.md");
     Require(readme.Contains("official SPT 4.1.4", StringComparison.Ordinal) &&
-            readme.Contains("HollywoodFX-2.0.17.zip", StringComparison.Ordinal) &&
+            readme.Contains("HollywoodFX-2.0.18.zip", StringComparison.Ordinal) &&
             !readme.Contains("SPT 4.1.3", StringComparison.Ordinal),
         "installation or package documentation has a stale release target");
     var bugForm = ReadEmbeddedSource("bug_report.yml");
     Require(bugForm.Contains("placeholder: 4.1.4", StringComparison.Ordinal) &&
-            bugForm.Contains("placeholder: 2.0.17", StringComparison.Ordinal),
+            bugForm.Contains("placeholder: 2.0.18", StringComparison.Ordinal),
         "bug report version examples have a stale release target");
 }
 

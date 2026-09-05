@@ -26,7 +26,8 @@ namespace HollywoodFX;
 public class Plugin : BaseUnityPlugin
 {
     public const string MajorMinorVersion = "2.0";
-    public const string HollywoodFXVersion = $"{MajorMinorVersion}.17";
+    public const string HollywoodFXVersion = $"{MajorMinorVersion}.18";
+    public const string BuildVersion = HollywoodFXVersion;
 
     public static ManualLogSource Log;
     public static BloodRenderOwnership BloodRenderOwnership { get; private set; } =
@@ -130,6 +131,7 @@ public class Plugin : BaseUnityPlugin
     private void Awake()
     {
         Log = Logger;
+        Log.LogInfo($"HollywoodFX {BuildVersion}: official SPT 4.1.4.");
 
         AssetRegistry.LoadBundles();
 
@@ -374,7 +376,7 @@ public class Plugin : BaseUnityPlugin
             null,
             new ConfigurationManagerAttributes { Order = 18 }
         ));
-        BallisticImpactSparkIntensity = Config.Bind(impacts, "Ballistic Impact Spark Intensity", 1f, new ConfigDescription(
+        BallisticImpactSparkIntensity = Config.Bind(impacts, "Ballistic Impact Spark Intensity", RealismDefaults.SparkIntensity, new ConfigDescription(
             "Scales spark probability and particle count without enlarging the particles.",
             new AcceptableValueRange<float>(0f, 2f),
             new ConfigurationManagerAttributes { Order = 17 }
@@ -385,7 +387,7 @@ public class Plugin : BaseUnityPlugin
             new ConfigurationManagerAttributes { Order = 16, IsAdvanced = true }
         ));
 
-        EffectSize = Config.Bind(impacts, "Impact Effect Size", 0.75f, new ConfigDescription(
+        EffectSize = Config.Bind(impacts, "Impact Effect Size", RealismDefaults.ImpactSize, new ConfigDescription(
             "Scales the size of impact effects.",
             new AcceptableValueRange<float>(0.1f, 5f),
             new ConfigurationManagerAttributes { Order = 2 }
@@ -430,7 +432,7 @@ public class Plugin : BaseUnityPlugin
         /*
          * Explosions
          */
-        ExplosionDensityFireball = Config.Bind(explosions, "Fireball Density", 1f, new ConfigDescription(
+        ExplosionDensityFireball = Config.Bind(explosions, "Fireball Density", RealismDefaults.FireballDensity, new ConfigDescription(
             "Adjusts the density of fireballs. Large values may have a performance impact",
             new AcceptableValueRange<float>(0, 10f),
             new ConfigurationManagerAttributes { Order = 6 }
@@ -447,7 +449,7 @@ public class Plugin : BaseUnityPlugin
             new ConfigurationManagerAttributes { Order = 4 }
         ));
 
-        ExplosionDensitySparks = Config.Bind(explosions, "Sparks Density (CPU HEAVY)", 1f, new ConfigDescription(
+        ExplosionDensitySparks = Config.Bind(explosions, "Sparks Density (CPU HEAVY)", RealismDefaults.ExplosionSparkDensity, new ConfigDescription(
             "Adjusts the density of debris and sparks. Large values may have a performance impact",
             new AcceptableValueRange<float>(0, 10f),
             new ConfigurationManagerAttributes { Order = 3 }
@@ -474,31 +476,31 @@ public class Plugin : BaseUnityPlugin
             new ConfigurationManagerAttributes { Order = 7 }
         ));
 
-        MuzzleEffectJetsSize = Config.Bind(muzzleEffects, "Muzzle Jet Size", 1f, new ConfigDescription(
+        MuzzleEffectJetsSize = Config.Bind(muzzleEffects, "Muzzle Jet Size", RealismDefaults.MuzzleJetSize, new ConfigDescription(
             "Adjusts the size of the muzzle flame jets.",
             new AcceptableValueRange<float>(0, 10f),
             new ConfigurationManagerAttributes { Order = 6 }
         ));
 
-        MuzzleEffectSparksSize = Config.Bind(muzzleEffects, "Muzzle Sparks Size", 1f, new ConfigDescription(
+        MuzzleEffectSparksSize = Config.Bind(muzzleEffects, "Muzzle Sparks Size", RealismDefaults.MuzzleSparkSize, new ConfigDescription(
             "Adjusts the size of the muzzle sparks.",
             new AcceptableValueRange<float>(0, 10f),
             new ConfigurationManagerAttributes { Order = 5 }
         ));
 
-        MuzzleEffectSparksEmission = Config.Bind(muzzleEffects, "Muzzle Sparks Emission Rate (RESTART)", 1f, new ConfigDescription(
+        MuzzleEffectSparksEmission = Config.Bind(muzzleEffects, "Muzzle Sparks Emission Rate (RESTART)", RealismDefaults.MuzzleSparkEmission, new ConfigDescription(
             "Adjusts the amount of muzzle sparks generated.",
             new AcceptableValueRange<float>(0.1f, 10f),
             new ConfigurationManagerAttributes { Order = 4 }
         ));
 
-        MuzzleEffectSmokeSize = Config.Bind(muzzleEffects, "Muzzle Smoke Size", 1f, new ConfigDescription(
+        MuzzleEffectSmokeSize = Config.Bind(muzzleEffects, "Muzzle Smoke Size", RealismDefaults.MuzzleSmokeSize, new ConfigDescription(
             "Adjusts the size of the muzzle smoke.",
             new AcceptableValueRange<float>(0, 10f),
             new ConfigurationManagerAttributes { Order = 3 }
         ));
 
-        MuzzleEffectSmokeEmission = Config.Bind(muzzleEffects, "Muzzle Smoke Emission Rate (RESTART)", 1f, new ConfigDescription(
+        MuzzleEffectSmokeEmission = Config.Bind(muzzleEffects, "Muzzle Smoke Emission Rate (RESTART)", RealismDefaults.MuzzleSmokeEmission, new ConfigDescription(
             "Adjusts the amount of muzzle smoke generated. If you are looking to hotbox with some scavs, set it to 3 or something.",
             new AcceptableValueRange<float>(0.1f, 10f),
             new ConfigurationManagerAttributes { Order = 2 }
@@ -528,7 +530,7 @@ public class Plugin : BaseUnityPlugin
             null,
             new ConfigurationManagerAttributes { Order = 15 }
         ));
-        ConcussionDuration = Config.Bind(battleAmbience, "Concussion Duration", 1f, new ConfigDescription(
+        ConcussionDuration = Config.Bind(battleAmbience, "Concussion Duration", RealismDefaults.ConcussionDuration, new ConfigDescription(
             "Scales the duration of concussion effects. Larger numbers will result in longer lasting concussion.",
             new AcceptableValueRange<float>(0, 10f),
             new ConfigurationManagerAttributes { Order = 14 }
@@ -538,7 +540,7 @@ public class Plugin : BaseUnityPlugin
             new AcceptableValueRange<float>(0, 10f),
             new ConfigurationManagerAttributes { Order = 13 }
         ));
-        SuppressionEnabled = Config.Bind(battleAmbience, "Enable Suppression FX", true, new ConfigDescription(
+        SuppressionEnabled = Config.Bind(battleAmbience, "Enable Suppression FX", RealismDefaults.SuppressionEnabled, new ConfigDescription(
             "Toggles suppression screen effects.",
             null,
             new ConfigurationManagerAttributes { Order = 12 }
@@ -554,7 +556,7 @@ public class Plugin : BaseUnityPlugin
             new ConfigurationManagerAttributes { Order = 10 }
         ));
         
-        BattleBlurIntensity = Config.Bind(battleAmbience, "Battle Blur Intensity", 1f, new ConfigDescription(
+        BattleBlurIntensity = Config.Bind(battleAmbience, "Battle Blur Intensity", RealismDefaults.BattleBlurIntensity, new ConfigDescription(
             "Scales the intensity of battle blur from concussion and suppression effects.",
             new AcceptableValueRange<float>(0, 10f),
             new ConfigurationManagerAttributes { Order = 9 }
@@ -566,7 +568,7 @@ public class Plugin : BaseUnityPlugin
             new ConfigurationManagerAttributes { Order = 4, IsAdvanced = true }
         ));
 
-        AmbientEffectDensity = Config.Bind(battleAmbience, "Ambient Effect Emission Rate", 1f, new ConfigDescription(
+        AmbientEffectDensity = Config.Bind(battleAmbience, "Ambient Effect Emission Rate", RealismDefaults.AmbientEmission, new ConfigDescription(
             "Adjusts the density of ambient effects. The bigger this number, the denser the smoke, debris, glitter etc...",
             new AcceptableValueRange<float>(0.1f, 5f),
             new ConfigurationManagerAttributes { Order = 3 }
@@ -681,7 +683,7 @@ public class Plugin : BaseUnityPlugin
             new ConfigurationManagerAttributes { Order = 4, ReadOnly = visceralCombatDetected }
         ));
 
-        RagdollCinematicEnabled = Config.Bind(ragdoll, "Enable Cinematic Ragdolls (RESTART)", true, new ConfigDescription(
+        RagdollCinematicEnabled = Config.Bind(ragdoll, "Enable Cinematic Ragdolls (RESTART)", RealismDefaults.CinematicRagdolls, new ConfigDescription(
             "Adjusts the skeletal and joint characteristics of ragdolls for a more Cinematic (TM) experience.",
             new AcceptableValueList<bool>(ragdollAcceptableValues),
             new ConfigurationManagerAttributes { Order = 3, ReadOnly = visceralCombatDetected }
@@ -720,7 +722,7 @@ public class Plugin : BaseUnityPlugin
             new ConfigurationManagerAttributes { Order = 8 }
         ));
 
-        MiscShellSize = Config.Bind(misc, "Spent Shells Size", 1.5f, new ConfigDescription(
+        MiscShellSize = Config.Bind(misc, "Spent Shells Size", RealismDefaults.ShellSize, new ConfigDescription(
             "Adjusts the size of spent shells multiplicatively (2 means 2x the size).",
             new AcceptableValueRange<float>(0f, 10f),
             new ConfigurationManagerAttributes { Order = 7 }
@@ -728,7 +730,7 @@ public class Plugin : BaseUnityPlugin
         MiscShellSize.SettingChanged += (_, _) => EFTHardSettings.Instance.Shells.radius = MiscShellSize.Value / 1000f;
         EFTHardSettings.Instance.Shells.radius = MiscShellSize.Value / 1000f;
 
-        MiscShellVelocity = Config.Bind(misc, "Shell Ejection Velocity", 1.5f, new ConfigDescription(
+        MiscShellVelocity = Config.Bind(misc, "Shell Ejection Velocity", RealismDefaults.ShellVelocity, new ConfigDescription(
             "Adjusts the velocity of the spent shells multiplicatively (2 means 2x the speed).",
             new AcceptableValueRange<float>(0f, 10f),
             new ConfigurationManagerAttributes { Order = 6 }
