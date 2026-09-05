@@ -1,24 +1,24 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Comfort.Common;
 using DeferredDecals;
 using EFT.Ballistics;
+using EFT.InventoryLogic;
 using HarmonyLib;
 using HollywoodFX.Decal;
 using HollywoodFX.Particles;
 using JsonType;
 using Systems.Effects;
 using UnityEngine;
-using EFT.InventoryLogic;
 using Random = UnityEngine.Random;
 
 namespace HollywoodFX;
 
-internal class TracerImpact(EffectSystem[] systems, float chance, float ricochetChance, bool decal = false)
+internal class TracerImpact(EffectSystem[] systems, float chance, float residueSuppressionChance, bool decal = false)
 {
     public readonly EffectSystem[] Systems = systems;
     public readonly float Chance = chance;
-    public readonly float RicochetChance = ricochetChance;
+    public readonly float ResidueSuppressionChance = residueSuppressionChance;
     public readonly bool Decal = decal;
 }
 
@@ -33,135 +33,59 @@ internal class TracerImpactEffects
 
     private readonly LightPool _lightPool;
 
-    public TracerImpactEffects(Effects eftEffects, Dictionary<string, EffectBundle> mainEffects, Dictionary<string, EffectBundle> tracerEffects)
+    public TracerImpactEffects(Effects eftEffects, Dictionary<string, EffectBundle> tracerEffects)
     {
-        Plugin.Log.LogInfo("Defining tracer effect bundles");
-        var sparksWide = tracerEffects["Sparks_Wide"];
-        var sparksGeneric = tracerEffects["Sparks_Generic"];
-        var sparksGround = tracerEffects["Sparks_Ground"];
+        Plugin.Log.LogInfo("Defining tracer-only impact effect bundles");
         var sparksFlammable = tracerEffects["Sparks_Flammable"];
-        var sparksFlammableGround = tracerEffects["Sparks_Flammable_Ground"];
-        var sparksHorRight = tracerEffects["Sparks_Hor_Right"];
-        var sparksHorLeft = tracerEffects["Sparks_Hor_Left"];
-        var sparksFalling = tracerEffects["Sparks_Falling"];
         var debrisFlammable = tracerEffects["Debris_Flammable"];
-
-        var sparksGroundComb = EffectBundle.Merge(sparksGround, sparksWide);
-
-        var flashSparks = mainEffects["Flash_Sparks"];
-
         var flame = tracerEffects["Flame"];
+
         _tracerGreen = tracerEffects["Tracer_Green"];
         _tracerRed = tracerEffects["Tracer_Red"];
         _tracerYellow = tracerEffects["Tracer_Yellow"];
         _tracerWhite = tracerEffects["Tracer_White"];
 
-        var lowFlammable =
-            new[]
-            {
-                new EffectSystem(
-                    directional:
-                    [
-                        new DirectionalEffect(sparksHorRight, camDir: CamDir.Angled | CamDir.Right, worldDir: WorldDir.Horizontal),
-                        new DirectionalEffect(sparksHorLeft, camDir: CamDir.Angled | CamDir.Left, worldDir: WorldDir.Horizontal),
-                        new DirectionalEffect(sparksGroundComb, worldDir: WorldDir.Vertical | WorldDir.Up),
-                    ],
-                    generic: sparksGeneric,
-                    forceGeneric: 0.33f,
-                    useOffsetNormals: true
-                ),
-                new EffectSystem(
-                    directional:
-                    [
-                        new DirectionalEffect(flashSparks),
-                        new DirectionalEffect(sparksFalling, worldDir: WorldDir.Horizontal | WorldDir.Down, chance: 0.4f,
-                            isChanceScaledByKinetics: true),
-                    ]
-                )
-            };
-
-        var midFlammable =
-            new[]
-            {
-                new EffectSystem(
-                    directional:
-                    [
-                        new DirectionalEffect(sparksHorRight, camDir: CamDir.Angled | CamDir.Right, worldDir: WorldDir.Horizontal),
-                        new DirectionalEffect(sparksHorLeft, camDir: CamDir.Angled | CamDir.Left, worldDir: WorldDir.Horizontal),
-                        new DirectionalEffect(sparksGroundComb, worldDir: WorldDir.Vertical | WorldDir.Up),
-                    ],
-                    generic: sparksGeneric,
-                    forceGeneric: 0.33f,
-                    useOffsetNormals: true
-                ),
-                new EffectSystem(
-                    directional:
-                    [
-                        new DirectionalEffect(flashSparks),
-                        new DirectionalEffect(debrisFlammable, chance: 0.1f, isChanceScaledByKinetics: true),
-                        new DirectionalEffect(flame, worldDir: WorldDir.Vertical | WorldDir.Up, chance: 0.1f, isChanceScaledByKinetics: true),
-                        new DirectionalEffect(sparksFalling, worldDir: WorldDir.Horizontal | WorldDir.Down, chance: 0.1f,
-                            isChanceScaledByKinetics: true),
-                    ]
-                )
-            };
-
-        var highFlammable =
-            new[]
-            {
-                new EffectSystem(
-                    directional:
-                    [
-                        new DirectionalEffect(sparksHorRight, camDir: CamDir.Angled | CamDir.Right, worldDir: WorldDir.Horizontal),
-                        new DirectionalEffect(sparksHorLeft, camDir: CamDir.Angled | CamDir.Left, worldDir: WorldDir.Horizontal),
-                        new DirectionalEffect(sparksFlammableGround, worldDir: WorldDir.Vertical | WorldDir.Up),
-                    ],
-                    generic: sparksGeneric,
-                    forceGeneric: 0.33f,
-                    useOffsetNormals: true
-                ),
-                new EffectSystem(
-                    directional:
-                    [
-                        new DirectionalEffect(sparksFlammable),
-                        new DirectionalEffect(debrisFlammable, chance: 0.35f, isChanceScaledByKinetics: true),
-                        new DirectionalEffect(flame, worldDir: WorldDir.Vertical | WorldDir.Up, chance: 0.5f, isChanceScaledByKinetics: true),
-                    ]
-                )
-            };
+        var noCombustion = Array.Empty<EffectSystem>();
+        var combustible = new[]
+        {
+            new EffectSystem(
+                directional:
+                [
+                    new DirectionalEffect(sparksFlammable, chance: 0.2f, isChanceScaledByKinetics: true),
+                    new DirectionalEffect(debrisFlammable, chance: 0.25f, isChanceScaledByKinetics: true),
+                    new DirectionalEffect(flame, worldDir: WorldDir.Vertical | WorldDir.Up, chance: 0.25f,
+                        isChanceScaledByKinetics: true)
+                ])
+        };
 
         _impacts = new TracerImpact[Enum.GetNames(typeof(MaterialType)).Length];
 
-        // Assign impact systems to materials
-        _impacts[(int)MaterialType.Asphalt] = new TracerImpact(midFlammable, 0.45f, 0.6f, decal: true);
-        _impacts[(int)MaterialType.Cardboard] = new TracerImpact(highFlammable, 0.6f, 0.1f, decal: true);
-        _impacts[(int)MaterialType.Chainfence] = new TracerImpact(lowFlammable, 0.35f, 0.35f);
-        _impacts[(int)MaterialType.Concrete] = new TracerImpact(midFlammable, 0.6f, 0.75f);
-        _impacts[(int)MaterialType.Fabric] = new TracerImpact(highFlammable, 0.5f, 0.1f, decal: true);
-        _impacts[(int)MaterialType.GarbageMetal] = new TracerImpact(lowFlammable, 0.5f, 0.7f);
-        _impacts[(int)MaterialType.GarbagePaper] = new TracerImpact(highFlammable, 0.6f, 0.1f, decal: true);
-        _impacts[(int)MaterialType.GenericSoft] = new TracerImpact(highFlammable, 0.4f, 0.1f, decal: true);
-        _impacts[(int)MaterialType.Glass] = new TracerImpact(lowFlammable, 0.35f, 0.35f);
-        _impacts[(int)MaterialType.GlassShattered] = new TracerImpact(lowFlammable, 0.35f, 0.35f);
-        _impacts[(int)MaterialType.Grate] = new TracerImpact(lowFlammable, 0.35f, 0.6f);
-        _impacts[(int)MaterialType.GrassHigh] = new TracerImpact(highFlammable, 0.3f, 0.2f, decal: true);
-        _impacts[(int)MaterialType.GrassLow] = new TracerImpact(highFlammable, 0.3f, 0.3f, decal: true);
-        _impacts[(int)MaterialType.Gravel] = new TracerImpact(lowFlammable, 0.5f, 0.4f);
-        _impacts[(int)MaterialType.MetalThin] = new TracerImpact(lowFlammable, 0.6f, 0.6f);
-        _impacts[(int)MaterialType.MetalThick] = new TracerImpact(lowFlammable, 0.6f, 0.8f);
-        // _impacts[(int)MaterialType.Mud] = ;
-        _impacts[(int)MaterialType.Pebbles] = new TracerImpact(lowFlammable, 0.35f, 0.4f);
-        _impacts[(int)MaterialType.Plastic] = new TracerImpact(highFlammable, 0.5f, 0.1f, decal: true);
-        _impacts[(int)MaterialType.Stone] = new TracerImpact(lowFlammable, 0.45f, 0.5f);
-        // _impacts[(int)MaterialType.Soil] = ;
-        // _impacts[(int)MaterialType.SoilForest] = ;
-        _impacts[(int)MaterialType.Tile] = new TracerImpact(lowFlammable, 0.5f, 0.5f);
-        _impacts[(int)MaterialType.WoodThick] = new TracerImpact(highFlammable, 0.6f, 0.1f, decal: true);
-        _impacts[(int)MaterialType.WoodThin] = new TracerImpact(highFlammable, 0.45f, 0.1f, decal: true);
-        _impacts[(int)MaterialType.Tyre] = new TracerImpact(highFlammable, 0.5f, 0.1f, decal: true);
-        _impacts[(int)MaterialType.Rubber] = new TracerImpact(highFlammable, 0.5f, 0.1f, decal: true);
-        _impacts[(int)MaterialType.GenericHard] = new TracerImpact(lowFlammable, 0.35f, 0.5f);
-        _impacts[(int)MaterialType.MetalNoDecal] = new TracerImpact(lowFlammable, 0.45f, 0.6f);
+        _impacts[(int)MaterialType.Asphalt] = new TracerImpact(noCombustion, 0.45f, 0.6f, decal: true);
+        _impacts[(int)MaterialType.Cardboard] = new TracerImpact(combustible, 0.6f, 0.1f, decal: true);
+        _impacts[(int)MaterialType.Chainfence] = new TracerImpact(noCombustion, 0.35f, 0.35f);
+        _impacts[(int)MaterialType.Concrete] = new TracerImpact(noCombustion, 0.6f, 0.75f);
+        _impacts[(int)MaterialType.Fabric] = new TracerImpact(combustible, 0.5f, 0.1f, decal: true);
+        _impacts[(int)MaterialType.GarbageMetal] = new TracerImpact(noCombustion, 0.5f, 0.7f);
+        _impacts[(int)MaterialType.GarbagePaper] = new TracerImpact(combustible, 0.6f, 0.1f, decal: true);
+        _impacts[(int)MaterialType.GenericSoft] = new TracerImpact(combustible, 0.4f, 0.1f, decal: true);
+        _impacts[(int)MaterialType.Glass] = new TracerImpact(noCombustion, 0.35f, 0.35f);
+        _impacts[(int)MaterialType.GlassShattered] = new TracerImpact(noCombustion, 0.35f, 0.35f);
+        _impacts[(int)MaterialType.Grate] = new TracerImpact(noCombustion, 0.35f, 0.6f);
+        _impacts[(int)MaterialType.GrassHigh] = new TracerImpact(combustible, 0.3f, 0.2f, decal: true);
+        _impacts[(int)MaterialType.GrassLow] = new TracerImpact(combustible, 0.3f, 0.3f, decal: true);
+        _impacts[(int)MaterialType.Gravel] = new TracerImpact(noCombustion, 0.5f, 0.4f);
+        _impacts[(int)MaterialType.MetalThin] = new TracerImpact(noCombustion, 0.6f, 0.6f);
+        _impacts[(int)MaterialType.MetalThick] = new TracerImpact(noCombustion, 0.6f, 0.8f);
+        _impacts[(int)MaterialType.Pebbles] = new TracerImpact(noCombustion, 0.35f, 0.4f);
+        _impacts[(int)MaterialType.Plastic] = new TracerImpact(combustible, 0.5f, 0.1f, decal: true);
+        _impacts[(int)MaterialType.Stone] = new TracerImpact(noCombustion, 0.45f, 0.5f);
+        _impacts[(int)MaterialType.Tile] = new TracerImpact(noCombustion, 0.5f, 0.5f);
+        _impacts[(int)MaterialType.WoodThick] = new TracerImpact(combustible, 0.6f, 0.1f, decal: true);
+        _impacts[(int)MaterialType.WoodThin] = new TracerImpact(combustible, 0.45f, 0.1f, decal: true);
+        _impacts[(int)MaterialType.Tyre] = new TracerImpact(combustible, 0.5f, 0.1f, decal: true);
+        _impacts[(int)MaterialType.Rubber] = new TracerImpact(combustible, 0.5f, 0.1f, decal: true);
+        _impacts[(int)MaterialType.GenericHard] = new TracerImpact(noCombustion, 0.35f, 0.5f);
+        _impacts[(int)MaterialType.MetalNoDecal] = new TracerImpact(noCombustion, 0.45f, 0.6f);
 
         _lightPool = Traverse.Create(eftEffects).Field("_lightPool").GetValue<LightPool>();
     }
@@ -169,29 +93,20 @@ internal class TracerImpactEffects
     public void Emit(ImpactKinetics kinetics, Ammo ammo)
     {
         var impactDef = _impacts[(int)kinetics.Material];
-
-        if (impactDef == null)
-            return;
-
-        if (!(Random.Range(0f, 1f) < impactDef.Chance * kinetics.Bullet.ChanceScale))
+        if (impactDef == null || Random.value >= impactDef.Chance * kinetics.Bullet.ChanceScale)
             return;
 
         if (impactDef.Decal)
         {
             Singleton<DecalPainter>.Instance.DrawDecal(
-                Decals.TracerScorchMark, kinetics.Position, kinetics.Normal, kinetics.Bullet.Info.HittedBallisticCollider
-            );
+                Decals.TracerScorchMark, kinetics.Position, kinetics.Normal, kinetics.Bullet.Info.HittedBallisticCollider);
         }
 
         for (var i = 0; i < impactDef.Systems.Length; i++)
-        {
-            var system = impactDef.Systems[i];
-            system.Emit(kinetics, Plugin.EffectSize.Value);
-        }
+            impactDef.Systems[i].Emit(kinetics, Plugin.EffectSize.Value);
 
         var lightColor = Color.white;
-        var tracer = _tracerWhite; 
-        
+        var tracer = _tracerWhite;
         switch (ammo.TracerColor)
         {
             case TaxonomyColor.green or TaxonomyColor.tracerGreen:
@@ -207,15 +122,17 @@ internal class TracerImpactEffects
                 lightColor = new Color(1f, 0.9540824f, 0.7960784f);
                 break;
         }
-        
-        if (!(Random.Range(0f, 1f) < impactDef.RicochetChance * kinetics.Bullet.ChanceScale))
-        {
-            tracer.EmitDirect(kinetics.Position, kinetics.Normal, kinetics.Bullet.SizeScale * Plugin.EffectSize.Value);
-        }
 
-        if (kinetics.DistanceToImpact <= 50f)
-        {
+        if (Random.value >= impactDef.ResidueSuppressionChance * kinetics.Bullet.ChanceScale)
+            tracer.EmitDirect(kinetics.Position, kinetics.Normal, kinetics.Bullet.SizeScale * Plugin.EffectSize.Value);
+
+        if (kinetics.DistanceToImpact <= 50f && !HasEnhancedNativeImpactLight(kinetics.Material))
             _lightPool.Add(kinetics.Position, lightColor, 2.5f);
-        }
+    }
+
+    private static bool HasEnhancedNativeImpactLight(MaterialType material)
+    {
+        return material is MaterialType.Chainfence or MaterialType.GarbageMetal or MaterialType.Grate or
+            MaterialType.MetalThin or MaterialType.MetalThick or MaterialType.MetalNoDecal;
     }
 }

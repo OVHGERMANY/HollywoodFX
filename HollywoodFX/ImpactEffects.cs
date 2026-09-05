@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using Comfort.Common;
 using EFT.Ballistics;
+using HollywoodFX.Impact.Sparks;
 using HollywoodFX.Particles;
 using HollywoodFX.Render;
 using Systems.Effects;
 using UnityEngine;
 using EFT.InventoryLogic;
-using Random = UnityEngine.Random;
 
 namespace System.Runtime.CompilerServices
 {
@@ -24,98 +24,49 @@ namespace HollywoodFX
     {
         private readonly List<EffectSystem>[] _mainImpacts;
         private readonly TracerImpactEffects _tracerImpacts;
-
-        private readonly EffectSystem _extraFlashes;
-        private readonly float[] _extraFlashChances;
+        private readonly BallisticSparkEffects _ballisticSparks;
 
         public ImpactEffects(Effects eftEffects, Dictionary<string, EffectBundle> mainEffects, GameObject tracerPrefab)
         {
             var tracerEffects = EffectBundle.LoadPrefab(eftEffects, tracerPrefab, false);
 
             _mainImpacts = DefineMainEffects(mainEffects);
-            _tracerImpacts = new TracerImpactEffects(eftEffects, mainEffects, tracerEffects);
-
-            _extraFlashes = DefineExtraFlashes(tracerEffects);
-            _extraFlashChances = DefineExtraFlashChances();
+            _ballisticSparks = new BallisticSparkEffects(mainEffects);
+            _tracerImpacts = new TracerImpactEffects(eftEffects, tracerEffects);
         }
 
         public void Emit(ImpactKinetics kinetics)
         {
             var currentSystems = _mainImpacts[(int)kinetics.Material];
 
-            if (currentSystems == null)
-                return;
-
-            for (var i = 0; i < currentSystems.Count; i++)
+            if (currentSystems != null)
             {
-                var impactSystem = currentSystems[i];
-                impactSystem.Emit(kinetics, Plugin.EffectSize.Value);
+                for (var i = 0; i < currentSystems.Count; i++)
+                {
+                    var impactSystem = currentSystems[i];
+                    impactSystem.Emit(kinetics, Plugin.EffectSize.Value);
+                }
+
+                var isLocalShot = kinetics.Bullet.Info?.Player is { iPlayer.IsYourPlayer: true };
+
+                if (Plugin.SuppressionEnabled.Value && !isLocalShot && Singleton<PostProcessing>.Instance != null)
+                {
+                    var duration = Plugin.SuppressionDuration.Value;
+                    var distanceNorm = 3f * kinetics.Bullet.SizeScale * Plugin.SuppressionRange.Value;
+                    Singleton<PostProcessing>.Instance.Concussion.Apply(kinetics.DistanceToImpact, duration, distanceNorm, 2f * duration);
+                }
             }
 
-            var isLocalShot = kinetics.Bullet.Info?.Player is { iPlayer.IsYourPlayer: true };
+            var isTracer = kinetics.Bullet.Info?.Ammo is Ammo { Tracer: true };
+            _ballisticSparks.Emit(kinetics, isTracer);
 
-            if (Plugin.SuppressionEnabled.Value && !isLocalShot && Singleton<PostProcessing>.Instance != null)
-            {
-                var duration = 1f * Plugin.SuppressionDuration.Value;
-                var distanceNorm = 3f * kinetics.Bullet.SizeScale * Plugin.SuppressionRange.Value;
-                Singleton<PostProcessing>.Instance.Concussion.Apply(kinetics.DistanceToImpact, duration, distanceNorm, 2f * duration);
-            }
-
-            if (Plugin.TracerImpactsEnabled.Value && kinetics.Bullet.Info.Ammo is Ammo { Tracer: true } ammo)
+            if (Plugin.TracerImpactsEnabled.Value && isTracer && kinetics.Bullet.Info.Ammo is Ammo ammo)
                 _tracerImpacts.Emit(kinetics, ammo);
-            else
-            {
-                var chance = _extraFlashChances[(int)kinetics.Material];
-
-                if (!(Random.Range(0f, 1f) < chance * kinetics.Bullet.ChanceScale))
-                    return;
-
-                _extraFlashes.Emit(kinetics, Plugin.EffectSize.Value);
-            }
         }
 
-        private static EffectSystem DefineExtraFlashes(Dictionary<string, EffectBundle> tracerEffects)
+        public void Dispose()
         {
-            Plugin.Log.LogInfo("Defining extra flashes");
-            var sparksGeneric = tracerEffects["Sparks_Generic"];
-            var sparksHorRight = tracerEffects["Sparks_Hor_Right"];
-            var sparksHorLeft = tracerEffects["Sparks_Hor_Left"];
-
-            var sparksGroundComb = EffectBundle.Merge(tracerEffects["Sparks_Generic"], tracerEffects["Sparks_Wide"]);
-
-            return new EffectSystem(
-                directional:
-                [
-                    new DirectionalEffect(sparksHorRight, camDir: CamDir.Angled | CamDir.Right, worldDir: WorldDir.Horizontal),
-                    new DirectionalEffect(sparksHorLeft, camDir: CamDir.Angled | CamDir.Left, worldDir: WorldDir.Horizontal),
-                    new DirectionalEffect(sparksGroundComb, worldDir: WorldDir.Vertical | WorldDir.Up),
-                ],
-                generic: sparksGeneric,
-                forceGeneric: 0.33f,
-                useOffsetNormals: true
-            );
-        }
-
-        private static float[] DefineExtraFlashChances()
-        {
-            var chances = new float[Enum.GetNames(typeof(MaterialType)).Length];
-
-            chances[(int)MaterialType.Chainfence] = 0.15f;
-            chances[(int)MaterialType.Concrete] = 0.2f;
-            chances[(int)MaterialType.GarbageMetal] = 0.25f;
-            chances[(int)MaterialType.Glass] = 0.1f;
-            chances[(int)MaterialType.GlassShattered] = 0.1f;
-            chances[(int)MaterialType.Grate] = 0.2f;
-            chances[(int)MaterialType.Gravel] = 0.1f;
-            chances[(int)MaterialType.MetalThin] = 0.2f;
-            chances[(int)MaterialType.MetalThick] = 0.25f;
-            chances[(int)MaterialType.Pebbles] = 0.1f;
-            chances[(int)MaterialType.Stone] = 0.15f;
-            chances[(int)MaterialType.Tile] = 0.15f;
-            chances[(int)MaterialType.GenericHard] = 0.15f;
-            chances[(int)MaterialType.MetalNoDecal] = 0.25f;
-
-            return chances;
+            _ballisticSparks.Dispose();
         }
 
         private static List<EffectSystem>[] DefineMainEffects(Dictionary<string, EffectBundle> effectMap)
@@ -127,9 +78,6 @@ namespace HollywoodFX
             var puffFront = effectMap["Puff_Front"];
             var puffFrontDusty = effectMap["Puff_Front_Dusty"];
             var puffFrontRock = EffectBundle.Merge(puffFront, puffFrontDusty);
-
-            Plugin.Log.LogInfo("Building flash sparks");
-            var flashSparks = effectMap["Flash_Sparks"];
 
             Plugin.Log.LogInfo("Building generic puffs");
             var puffGeneric = effectMap["Puff"];
@@ -152,16 +100,6 @@ namespace HollywoodFX
 
             Plugin.Log.LogInfo("Building dust spray");
             var sprayDust = effectMap["Spray_Dust"];
-
-            Plugin.Log.LogInfo("Building spark spray");
-            var spraySparksLight = EffectBundle.Merge(
-                effectMap["Spray_Sparks_Light"], effectMap["Spray_Dust"], effectMap["Spray_Dust"],
-                effectMap["Spray_Dust"], effectMap["Spray_Dust"]
-            );
-
-            var spraySparksMetal = EffectBundle.Merge(
-                effectMap["Spray_Sparks_Metal"], effectMap["Spray_Sparks_Metal"], effectMap["Spray_Sparks_Light"]
-            );
 
             Plugin.Log.LogInfo("Building misc stuff");
             var bulletHoleSmoke = effectMap["Impact_Smoke"];
@@ -215,7 +153,7 @@ namespace HollywoodFX
                     directional:
                     [
                         new DirectionalEffect(puffFrontRock),
-                        new DirectionalEffect(spraySparksLight, chance: 1f, isChanceScaledByKinetics: true, pacing: 0.05f),
+                        new DirectionalEffect(sprayDust, chance: 0.8f, isChanceScaledByKinetics: true, pacing: 0.05f),
                         new DirectionalEffect(debrisGeneric, chance: 0.5f, isChanceScaledByKinetics: true, pacing: 0.25f),
                         new DirectionalEffect(debrisRock, chance: 0.35f, isChanceScaledByKinetics: true, pacing: 0.5f),
                         new DirectionalEffect(debrisDirtVert, worldDir: WorldDir.Vertical | WorldDir.Up),
@@ -315,7 +253,7 @@ namespace HollywoodFX
                     directional:
                     [
                         new DirectionalEffect(puffFront),
-                        new DirectionalEffect(spraySparksLight, chance: 0.75f, isChanceScaledByKinetics: true, pacing: 0.05f),
+                        new DirectionalEffect(sprayDust, chance: 0.6f, isChanceScaledByKinetics: true, pacing: 0.05f),
                         new DirectionalEffect(bulletHoleSmoke, chance: 0.05f, isChanceScaledByKinetics: true)
                     ]
                 )
@@ -359,8 +297,7 @@ namespace HollywoodFX
                     directional:
                     [
                         new DirectionalEffect(puffFront),
-                        new DirectionalEffect(flashSparks),
-                        new DirectionalEffect(spraySparksMetal, chance: 0.8f, isChanceScaledByKinetics: true, pacing: 0.05f),
+                        new DirectionalEffect(debrisGeneric, chance: 0.3f, isChanceScaledByKinetics: true, pacing: 0.2f),
                         new DirectionalEffect(bulletHoleSmoke, chance: 0.05f, isChanceScaledByKinetics: true)
                     ]
                 )

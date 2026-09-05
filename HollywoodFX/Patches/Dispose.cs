@@ -24,7 +24,8 @@ public class GameWorldDisposePostfixPatch : ModulePatch
         Plugin.Log.LogInfo("Disposing of static & long lived objects.");
 
         EffectsAwakePrefixPatch.ReleaseOwnedBloodMaterials();
-        
+
+        Singleton<ImpactController>.Instance?.Dispose();
         Singleton<DecalPainter>.Release(Singleton<DecalPainter>.Instance);
         Singleton<ImpactController>.Release(Singleton<ImpactController>.Instance);
         Singleton<BodyImpactEffects>.Release(Singleton<BodyImpactEffects>.Instance);

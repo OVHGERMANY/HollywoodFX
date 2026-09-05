@@ -27,6 +27,8 @@ public static class ConfigurationTemplates
         Plugin.ExplosionDensityDust.Value = 0.5f;
         Plugin.ExplosionDensitySmoke.Value = 0.5f;
         Plugin.ExplosionDensitySparks.Value = 0.5f;
+        Plugin.BallisticImpactSparkIntensity.Value = 0.5f;
+        Plugin.BallisticImpactSparkMaximumDistance.Value = 90f;
         
         Plugin.BloodSquirtEmission.Value = 0.3f;
         Plugin.BloodFinisherEmission.Value = 0.3f;

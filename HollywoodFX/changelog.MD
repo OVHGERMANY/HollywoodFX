@@ -1,4 +1,15 @@
-﻿# 2.0.15
+# 2.0.16
+* Reworked ballistic impact sparks into one material-, energy-, angle-, and impact-state-aware system.
+* Metallic impacts and ricochets now produce directional, bounded hot-fragment sprays.
+* Mineral impacts produce only rare restrained flecks; soft surfaces and bodies produce no generic sparks.
+* Penetration exits cannot repeat the full entry shower.
+* Centralized spark ownership prevents main-impact and tracer effects from stacking contact sparks.
+* Added smooth distance scaling, strict automatic-fire particle budgets, and bounded raid diagnostics.
+* RC2 hardening now uses raw incoming projectile energy, deterministic local sampling, and a fixed pellet/fragment family budget.
+* Particle leaves are selected by validated cached criteria and report one-time initialization metadata for runtime evidence.
+* No gameplay or ballistics behavior changes; the external asset bundle is unchanged.
+
+# 2.0.15
 * Added character-attached impact marks and explicit character/corpse geometry policy.
 * Preserved independent impacts and replace stock decals only after a custom mark succeeds.
 * Added restrained blood presentation and TraumaCore blood-render ownership gates.

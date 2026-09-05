@@ -79,11 +79,6 @@ public class BodyImpactEffects
         var puffGeneric = impactEffects["Puff"];
 
         var sprayDust = impactEffects["Spray_Dust"];
-        var spraySparksLight = EffectBundle.Merge(
-            impactEffects["Spray_Sparks_Light"], impactEffects["Spray_Dust"], impactEffects["Spray_Dust"],
-            impactEffects["Spray_Dust"], impactEffects["Spray_Dust"]
-        );
-
         _dustyImpact =
         [
             new EffectSystem(directional: [], generic: puffGeneric, forceGeneric: 1f, useOffsetNormals: true),
@@ -104,7 +99,6 @@ public class BodyImpactEffects
         _helmetImpact = new EffectSystem(
             directional:
             [
-                new DirectionalEffect(spraySparksLight, chance: 0.4f, isChanceScaledByKinetics: true, pacing: 0.05f),
                 new DirectionalEffect(impactEffects["Debris_Armor_Metal"], chance: 0.5f, isChanceScaledByKinetics: true, pacing: 0.1f)
             ]
         );

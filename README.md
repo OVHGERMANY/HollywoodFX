@@ -36,13 +36,14 @@ dotnet build .\HollywoodFX\HollywoodFX.csproj --configuration Release --target:D
 
 ## Package
 
-The asset bundle is about 1 GB and is intentionally kept outside Git. The packaging script accepts the bundle from an installed copy, verifies its pinned SHA-256, builds the DLL, and creates the deterministic `HollywoodFX-2.0.15.zip` release archive:
+The asset bundle is about 1 GB and is intentionally kept outside Git. The packaging script accepts the bundle from an installed copy, verifies its pinned SHA-256, builds the DLL, and creates the deterministic `HollywoodFX-2.0.16.zip` release archive:
 
 ```powershell
 .\scripts\New-ReleasePackage.ps1 -SptRoot 'E:\Games\SPT'
 ```
 
 Generated archives and checksum files are written under `artifacts/release/`, which Git ignores.
+Prerelease candidates use an explicit unique label, for example `-Version '2.0.16-rc.2'`.
 
 ## Bug reports
 

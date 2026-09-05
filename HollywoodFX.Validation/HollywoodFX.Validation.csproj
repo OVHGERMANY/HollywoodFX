@@ -14,6 +14,15 @@
     <Compile Include="..\HollywoodFX\Decal\PenetrationAperturePlan.cs" Link="Production\PenetrationAperturePlan.cs" />
     <Compile Include="..\HollywoodFX\Gore\BloodRenderOwnershipPolicy.cs" Link="Production\BloodRenderOwnershipPolicy.cs" />
     <Compile Include="..\HollywoodFX\Gore\GoreEligibilityPolicy.cs" Link="Production\GoreEligibilityPolicy.cs" />
+    <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkSurfaceClass.cs" Link="Production\Sparks\BallisticSparkSurfaceClass.cs" />
+    <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkImpactState.cs" Link="Production\Sparks\BallisticSparkImpactState.cs" />
+    <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkEnergy.cs" Link="Production\Sparks\BallisticSparkEnergy.cs" />
+    <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkPrng.cs" Link="Production\Sparks\BallisticSparkPrng.cs" />
+    <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkClusterBudget.cs" Link="Production\Sparks\BallisticSparkClusterBudget.cs" />
+    <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkProfile.cs" Link="Production\Sparks\BallisticSparkProfile.cs" />
+    <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkPlan.cs" Link="Production\Sparks\BallisticSparkPlan.cs" />
+    <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkPolicy.cs" Link="Production\Sparks\BallisticSparkPolicy.cs" />
+    <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkBudget.cs" Link="Production\Sparks\BallisticSparkBudget.cs" />
     <EmbeddedResource Include="..\HollywoodFX\Decal\SurfaceImpactMarks.cs" Link="ProductionSource\SurfaceImpactMarks.cs" />
     <EmbeddedResource Include="..\HollywoodFX\Decal\CharacterImpactMarks.cs" Link="ProductionSource\CharacterImpactMarks.cs" />
     <EmbeddedResource Include="..\HollywoodFX\Patches\ShotLifecycle.cs" Link="ProductionSource\ShotLifecycle.cs" />
@@ -22,5 +31,15 @@
     <EmbeddedResource Include="..\HollywoodFX\Gore\GoreController.cs" Link="ProductionSource\GoreController.cs" />
     <EmbeddedResource Include="..\HollywoodFX\ImpactController.cs" Link="ProductionSource\ImpactController.cs" />
     <EmbeddedResource Include="..\HollywoodFX\Plugin.cs" Link="ProductionSource\Plugin.cs" />
+    <EmbeddedResource Include="..\HollywoodFX\ConfigurationTemplates.cs" Link="ProductionSource\ConfigurationTemplates.cs" />
+    <EmbeddedResource Include="..\HollywoodFX\ImpactEffects.cs" Link="ProductionSource\ImpactEffects.cs" />
+    <EmbeddedResource Include="..\HollywoodFX\TracerImpactEffects.cs" Link="ProductionSource\TracerImpactEffects.cs" />
+    <EmbeddedResource Include="..\HollywoodFX\Impact\Sparks\BallisticSparkContextBuilder.cs" Link="ProductionSource\BallisticSparkContextBuilder.cs" />
+    <EmbeddedResource Include="..\HollywoodFX\Impact\Sparks\BallisticSparkEffects.cs" Link="ProductionSource\BallisticSparkEffects.cs" />
+    <EmbeddedResource Include="..\HollywoodFX\Impact\Sparks\BallisticSparkDiagnostics.cs" Link="ProductionSource\BallisticSparkDiagnostics.cs" />
+    <EmbeddedResource Include="..\HollywoodFX\Impact\Sparks\BallisticSparkClusterBudget.cs" Link="ProductionSource\BallisticSparkClusterBudget.cs" />
+    <EmbeddedResource Include="..\HollywoodFX\Particles\EffectBundle.cs" Link="ProductionSource\EffectBundle.cs" />
+    <EmbeddedResource Include="..\HollywoodFX\Patches\Dispose.cs" Link="ProductionSource\Dispose.cs" />
+    <EmbeddedResource Include="..\HollywoodFX\Patches\Effects.cs" Link="ProductionSource\Effects.cs" />
   </ItemGroup>
 </Project>
