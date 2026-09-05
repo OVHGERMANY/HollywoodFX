@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="..\HollywoodFX\Properties\AssemblyInfo.cs" Link="ReleaseMetadata\AssemblyInfo.cs" />
     <EmbeddedResource Include="..\HollywoodFX\HollywoodFX.csproj" Link="ReleaseMetadata\HollywoodFX.csproj" />
     <EmbeddedResource Include="..\scripts\New-ReleasePackage.ps1" Link="ReleaseMetadata\New-ReleasePackage.ps1" />
     <EmbeddedResource Include="..\README.md" Link="ReleaseMetadata\README.md" />
@@ -27,6 +28,8 @@
     <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkPlan.cs" Link="Production\Sparks\BallisticSparkPlan.cs" />
     <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkPolicy.cs" Link="Production\Sparks\BallisticSparkPolicy.cs" />
     <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkBudget.cs" Link="Production\Sparks\BallisticSparkBudget.cs" />
+    <Compile Include="..\HollywoodFX\Impact\Sparks\BallisticSparkEmissionFrame.cs" Link="Production\Sparks\BallisticSparkEmissionFrame.cs" />
+    <Compile Include="..\HollywoodFX\RealismDefaults.cs" Link="Production\RealismDefaults.cs" />
     <EmbeddedResource Include="..\HollywoodFX\Decal\SurfaceImpactMarks.cs" Link="ProductionSource\SurfaceImpactMarks.cs" />
     <EmbeddedResource Include="..\HollywoodFX\Decal\CharacterImpactMarks.cs" Link="ProductionSource\CharacterImpactMarks.cs" />
     <EmbeddedResource Include="..\HollywoodFX\Patches\ShotLifecycle.cs" Link="ProductionSource\ShotLifecycle.cs" />

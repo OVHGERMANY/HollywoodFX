@@ -44,7 +44,7 @@ public sealed class BallisticSparkClusterBudget
         public int Events;
     }
 
-    public BallisticSparkClusterAllowance Consume(
+    public BallisticSparkClusterAllowance Preview(
         bool clusterLimited,
         ulong clusterKey,
         int requestedParticles,
@@ -60,16 +60,18 @@ public sealed class BallisticSparkClusterBudget
             return new BallisticSparkClusterAllowance(0, requestedParticles, true, true);
 
         var slotIndex = ResolveSlot(clusterKey, unscaledTime);
+        // Keep every live family protected. Saturation may drop a new visual event,
+        // but it must not reopen a previous family's particle allowance.
+        if (slotIndex < 0)
+            return new BallisticSparkClusterAllowance(0, requestedParticles, true, true);
         ref var slot = ref _slots[slotIndex];
 
-        if (!slot.Occupied || slot.Key != clusterKey || unscaledTime < slot.WindowStartedAt ||
+        if (!slot.Occupied || slot.Key != clusterKey ||
             unscaledTime - slot.WindowStartedAt > ClusterWindowSeconds)
         {
-            slot.Occupied = true;
-            slot.Key = clusterKey;
-            slot.WindowStartedAt = unscaledTime;
-            slot.Particles = 0;
-            slot.Events = 0;
+            var initial = Math.Min(requestedParticles, PerClusterParticleCap);
+            return new BallisticSparkClusterAllowance(initial, requestedParticles - initial,
+                false, initial < requestedParticles);
         }
 
         if (slot.Events >= PerClusterEventCap)
@@ -81,13 +83,32 @@ public sealed class BallisticSparkClusterBudget
             return new BallisticSparkClusterAllowance(0, requestedParticles, false, true);
 
         var allowed = Math.Min(requestedParticles, remainingParticles);
-        slot.Events++;
-        slot.Particles += allowed;
         return new BallisticSparkClusterAllowance(
             allowed,
             requestedParticles - allowed,
             false,
             allowed < requestedParticles);
+    }
+
+    public BallisticSparkClusterAllowance Consume(
+        bool clusterLimited,
+        ulong clusterKey,
+        int requestedParticles,
+        float unscaledTime)
+    {
+        var allowance = Preview(clusterLimited, clusterKey, requestedParticles, unscaledTime);
+        if (!clusterLimited || allowance.AllowedParticles <= 0)
+            return allowance;
+
+        ref var slot = ref _slots[ResolveSlot(clusterKey, unscaledTime)];
+        if (!slot.Occupied || slot.Key != clusterKey ||
+            unscaledTime - slot.WindowStartedAt > ClusterWindowSeconds)
+        {
+            slot = new Slot { Occupied = true, Key = clusterKey, WindowStartedAt = unscaledTime };
+        }
+        slot.Events++;
+        slot.Particles += allowance.AllowedParticles;
+        return allowance;
     }
 
     public void Reset()
@@ -98,33 +119,24 @@ public sealed class BallisticSparkClusterBudget
     private int ResolveSlot(ulong clusterKey, float unscaledTime)
     {
         var available = -1;
-        var replacement = 0;
-        var oldestStart = float.MaxValue;
 
         for (var index = 0; index < _slots.Length; index++)
         {
             ref var slot = ref _slots[index];
-            if (slot.Occupied && slot.Key == clusterKey && unscaledTime >= slot.WindowStartedAt &&
+            if (slot.Occupied && slot.Key == clusterKey &&
                 unscaledTime - slot.WindowStartedAt <= ClusterWindowSeconds)
             {
                 return index;
             }
 
-            if (!slot.Occupied || unscaledTime < slot.WindowStartedAt ||
+            if (!slot.Occupied ||
                 unscaledTime - slot.WindowStartedAt > ClusterWindowSeconds)
             {
                 if (available < 0)
                     available = index;
-                continue;
-            }
-
-            if (slot.WindowStartedAt < oldestStart)
-            {
-                oldestStart = slot.WindowStartedAt;
-                replacement = index;
             }
         }
 
-        return available >= 0 ? available : replacement;
+        return available;
     }
 }

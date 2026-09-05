@@ -31,4 +31,4 @@ using HollywoodFX;
 //
 [assembly: AssemblyVersion(Plugin.HollywoodFXVersion + ".0")]
 [assembly: AssemblyFileVersion(Plugin.HollywoodFXVersion + ".0")]
-[assembly: AssemblyInformationalVersion(Plugin.HollywoodFXVersion)]
+[assembly: AssemblyInformationalVersion(Plugin.BuildVersion)]

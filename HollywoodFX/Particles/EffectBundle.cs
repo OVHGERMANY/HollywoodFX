@@ -7,6 +7,7 @@ using HollywoodFX.Impact.Sparks;
 using Systems.Effects;
 using UnityEngine;
 using Random = UnityEngine.Random;
+using SparkVector = System.Numerics.Vector3;
 
 namespace HollywoodFX.Particles;
 
@@ -19,9 +20,10 @@ public class Emitter
     private Transform _ballisticTransform;
     private ParticleSystem.MinMaxCurve _startSpeed;
     private ParticleSystem.MinMaxCurve _startLifetime;
-    private ParticleSystemSimulationSpace _simulationSpace;
-    private Transform _customSimulationSpace;
+    private ParticleSystem.MinMaxCurve _startSize;
     private bool _ballisticPrepared;
+    private string _ballisticEmitterName = "<null>";
+    private string _ballisticParticleSystemName = "<invalid>";
 
     public Emitter(ParticleSystem main)
     {
@@ -91,47 +93,51 @@ public class Emitter
         float spreadDegrees,
         ref BallisticSparkPrng random)
     {
-        if (count <= 0 || _ballisticSystem == null || _ballisticTransform == null)
+        if (count <= 0 || _ballisticSystem == null || _ballisticTransform == null ||
+            !BallisticSparkEmissionFrame.IsFinite(position.x) ||
+            !BallisticSparkEmissionFrame.IsFinite(position.y) ||
+            !BallisticSparkEmissionFrame.IsFinite(position.z) ||
+            !BallisticSparkEmissionFrame.IsFinite(scale) || scale <= 0f ||
+            !BallisticSparkEmissionFrame.IsFinite(velocityMultiplier) || velocityMultiplier < 0f ||
+            !BallisticSparkEmissionFrame.IsFinite(lifetimeMultiplier) || lifetimeMultiplier <= 0f ||
+            !BallisticSparkEmissionFrame.TryCreate(
+                new SparkVector(surfaceNormal.x, surfaceNormal.y, surfaceNormal.z),
+                new SparkVector(axis.x, axis.y, axis.z), spreadDegrees, out var frame))
             return 0;
 
-        _ballisticTransform.position = position;
-        _ballisticTransform.localScale = new Vector3(scale, scale, scale);
-        _ballisticTransform.rotation = Quaternion.LookRotation(axis);
+        var origin = ToUnityVector(frame.ResolvePosition(new SparkVector(position.x, position.y, position.z)));
+        var capacity = Math.Max(0, _ballisticSystem.main.maxParticles - _ballisticSystem.particleCount);
+        count = Math.Min(count, Math.Min(capacity, BallisticSparkPolicy.PerImpactParticleCap));
 
-        var spreadScale = Mathf.Tan(Mathf.Clamp(spreadDegrees, 0f, 75f) * Mathf.Deg2Rad);
+        var submitted = 0;
         for (var i = 0; i < count; i++)
         {
-            var randomVector = NextInsideUnitSphere(ref random);
-            var perpendicular = randomVector - axis * Vector3.Dot(randomVector, axis);
-            var direction = axis + perpendicular * spreadScale;
-            if (direction.sqrMagnitude < 0.000001f)
-                direction = axis;
-            else
-                direction.Normalize();
+            var direction = frame.SampleDirection(ref random);
+            var speed = Sample(_startSpeed, ref random) * velocityMultiplier;
+            var lifetime = Sample(_startLifetime, ref random) * lifetimeMultiplier;
+            var size = Sample(_startSize, ref random) * scale;
+            if (!BallisticSparkEmissionFrame.IsFinite(speed) || speed < 0f ||
+                !BallisticSparkEmissionFrame.IsFinite(lifetime) || lifetime <= 0f ||
+                !BallisticSparkEmissionFrame.IsFinite(size) || size <= 0f)
+                continue;
 
-            var normalComponent = Vector3.Dot(direction, surfaceNormal);
-            if (normalComponent < 0f)
-            {
-                direction -= surfaceNormal * normalComponent;
-                if (direction.sqrMagnitude < 0.000001f)
-                    direction = surfaceNormal;
-                else
-                    direction.Normalize();
-            }
-
-            var worldVelocity = direction * Mathf.Max(0f, Sample(_startSpeed, ref random) * velocityMultiplier);
+            var particleSeed = random.NextUInt();
             var emitParams = new ParticleSystem.EmitParams
             {
-                velocity = ToSimulationVelocity(worldVelocity),
-                startLifetime = Mathf.Clamp(
-                    Sample(_startLifetime, ref random) * lifetimeMultiplier,
-                    0.03f,
-                    MaximumBallisticLifetimeSeconds)
+                // Explicit world-space values keep a reused emitter from moving or
+                // resizing earlier sparks. Ignore the prefab's 5-15 cm spawn volumes.
+                position = origin,
+                applyShapeToPosition = false,
+                velocity = ToUnityVector(direction * speed),
+                startSize = size,
+                randomSeed = particleSeed == 0U ? 1U : particleSeed,
+                startLifetime = Mathf.Clamp(lifetime, 0.03f, MaximumBallisticLifetimeSeconds)
             };
             _ballisticSystem.Emit(emitParams, 1);
+            submitted++;
         }
 
-        return count;
+        return submitted;
     }
 
     public bool PrepareBallistic(string effectKey, int emitterIndex)
@@ -140,6 +146,7 @@ public class Emitter
             return _ballisticSystem != null;
 
         _ballisticPrepared = true;
+        _ballisticEmitterName = Main != null ? Main.name : "<null>";
         _ballisticSystem = ResolveBallisticSystem(Main, effectKey);
         if (_ballisticSystem == null)
         {
@@ -149,11 +156,11 @@ public class Emitter
         }
 
         _ballisticTransform = _ballisticSystem.transform;
+        _ballisticParticleSystemName = _ballisticSystem.name;
         var mainModule = _ballisticSystem.main;
         _startSpeed = mainModule.startSpeed;
         _startLifetime = mainModule.startLifetime;
-        _simulationSpace = mainModule.simulationSpace;
-        _customSimulationSpace = mainModule.customSimulationSpace;
+        _startSize = mainModule.startSize;
         var renderer = _ballisticSystem.GetComponent<ParticleSystemRenderer>();
         var trails = _ballisticSystem.trails;
         var lights = _ballisticSystem.lights;
@@ -165,19 +172,24 @@ public class Emitter
             $"scalingMode={mainModule.scalingMode} startSize={DescribeCurve(mainModule.startSize)} " +
             $"startSpeed={DescribeCurve(_startSpeed)} startLifetime={DescribeCurve(_startLifetime)} " +
             $"trails={trails.enabled} particleLight={lights.enabled} " +
-            $"subEmitters={subEmitters.enabled}:{subEmitters.subEmittersCount}");
+            $"subEmitters={subEmitters.enabled}:{subEmitters.subEmittersCount} " +
+            "runtimeSimulationSpace=World runtimeScalingMode=Shape runtimeParticleLight=false manualEmissionOnly=true");
         lights.enabled = false;
+        // These two effect keys belong exclusively to the ballistic spark owner.
+        // Configure once, before emission; do not transform live particles per impact.
+        mainModule.simulationSpace = ParticleSystemSimulationSpace.World;
+        mainModule.scalingMode = ParticleSystemScalingMode.Shape;
+        var emission = _ballisticSystem.emission;
+        emission.enabled = false;
+        _ballisticTransform.rotation = Quaternion.identity;
+        _ballisticTransform.localScale = Vector3.one;
         return true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Vector3 ToSimulationVelocity(Vector3 worldVelocity)
+    private static Vector3 ToUnityVector(SparkVector value)
     {
-        if (_simulationSpace == ParticleSystemSimulationSpace.World)
-            return worldVelocity;
-        if (_simulationSpace == ParticleSystemSimulationSpace.Custom && _customSimulationSpace != null)
-            return _customSimulationSpace.InverseTransformDirection(worldVelocity);
-        return _ballisticTransform.InverseTransformDirection(worldVelocity);
+        return new Vector3(value.X, value.Y, value.Z);
     }
 
     private static ParticleSystem ResolveBallisticSystem(ParticleSystem main, string effectKey)
@@ -240,22 +252,6 @@ public class Emitter
         }
     }
 
-    private static Vector3 NextInsideUnitSphere(ref BallisticSparkPrng random)
-    {
-        for (var attempt = 0; attempt < 4; attempt++)
-        {
-            var candidate = new Vector3(
-                random.NextSignedFloat(),
-                random.NextSignedFloat(),
-                random.NextSignedFloat());
-            var squareMagnitude = candidate.sqrMagnitude;
-            if (squareMagnitude is > 0.000001f and <= 1f)
-                return candidate;
-        }
-
-        return new Vector3(random.NextSignedFloat(), random.NextSignedFloat(), 0f);
-    }
-
     private static int ScoreBallisticCandidate(ParticleSystem candidate, string effectKey, ParticleSystem main)
     {
         var name = candidate.name ?? string.Empty;
@@ -297,9 +293,9 @@ public class Emitter
         return $"{curve.mode}:{curve.constantMin:F3}..{curve.constantMax:F3}:constant={curve.constant:F3}:multiplier={curve.curveMultiplier:F3}";
     }
 
-    public string BallisticEmitterName => Main?.name ?? "<null>";
+    public string BallisticEmitterName => _ballisticEmitterName;
 
-    public string BallisticParticleSystemName => _ballisticSystem?.name ?? "<invalid>";
+    public string BallisticParticleSystemName => _ballisticParticleSystemName;
 
     public bool IsBallisticCompatible => _ballisticSystem != null;
 
