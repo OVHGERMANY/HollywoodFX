@@ -78,7 +78,8 @@ var tests = new (string Name, Action Run)[]
     ("shot family key uses verified EFT metadata", ShotFamilyKeyUsesVerifiedEftMetadata),
     ("spark diagnostics cover hardening decisions", SparkDiagnosticsCoverHardeningDecisions),
     ("particle leaf validation logs cached metadata", ParticleLeafValidationLogsCachedMetadata),
-    ("emission axis retains finite outward guard", EmissionAxisRetainsFiniteOutwardGuard)
+    ("emission axis retains finite outward guard", EmissionAxisRetainsFiniteOutwardGuard),
+    ("SPT 4.1.4 release metadata stays aligned", Spt414ReleaseMetadataStaysAligned)
 };
 
 var failures = 0;
@@ -723,8 +724,8 @@ static void GenericArmorProfilesStayConservative()
 static void SparkConfigurationIsFocusedAndLive()
 {
     var source = ReadEmbeddedSource("Plugin.cs");
-    Require(source.Contains("HollywoodFXVersion = $\"{MajorMinorVersion}.16\"", StringComparison.Ordinal),
-        "plugin version is not 2.0.16");
+    Require(source.Contains("HollywoodFXVersion = $\"{MajorMinorVersion}.17\"", StringComparison.Ordinal),
+        "plugin version is not 2.0.17");
     Require(source.Contains("MajorMinorVersion = \"2.0\"", StringComparison.Ordinal),
         "minor update changed the configuration compatibility version");
     Require(source.Contains("\"Enable Ballistic Impact Sparks\", true", StringComparison.Ordinal),
@@ -1200,6 +1201,23 @@ static void Require(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
+}
+
+static void Spt414ReleaseMetadataStaysAligned()
+{
+    Require(ReadEmbeddedSource("New-ReleasePackage.ps1").Contains("$Version = '2.0.17'", StringComparison.Ordinal),
+        "package default does not match the plugin release");
+    Require(ReadEmbeddedSource("HollywoodFX.csproj").Contains("official SPT 4.1.4 path", StringComparison.Ordinal),
+        "build instructions do not target SPT 4.1.4");
+    var readme = ReadEmbeddedSource("README.md");
+    Require(readme.Contains("official SPT 4.1.4", StringComparison.Ordinal) &&
+            readme.Contains("HollywoodFX-2.0.17.zip", StringComparison.Ordinal) &&
+            !readme.Contains("SPT 4.1.3", StringComparison.Ordinal),
+        "installation or package documentation has a stale release target");
+    var bugForm = ReadEmbeddedSource("bug_report.yml");
+    Require(bugForm.Contains("placeholder: 4.1.4", StringComparison.Ordinal) &&
+            bugForm.Contains("placeholder: 2.0.17", StringComparison.Ordinal),
+        "bug report version examples have a stale release target");
 }
 
 static string ReadEmbeddedSource(string fileName)

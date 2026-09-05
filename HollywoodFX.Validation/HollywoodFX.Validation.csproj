@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="..\HollywoodFX\HollywoodFX.csproj" Link="ReleaseMetadata\HollywoodFX.csproj" />
+    <EmbeddedResource Include="..\scripts\New-ReleasePackage.ps1" Link="ReleaseMetadata\New-ReleasePackage.ps1" />
+    <EmbeddedResource Include="..\README.md" Link="ReleaseMetadata\README.md" />
+    <EmbeddedResource Include="..\.github\ISSUE_TEMPLATE\bug_report.yml" Link="ReleaseMetadata\bug_report.yml" />
     <Compile Include="..\HollywoodFX\Decal\BloodDecalPresentation.cs" Link="Production\BloodDecalPresentation.cs" />
     <Compile Include="..\HollywoodFX\Decal\CharacterImpactMarkPolicy.cs" Link="Production\CharacterImpactMarkPolicy.cs" />
     <Compile Include="..\HollywoodFX\Decal\CustomImpactGeometryPolicy.cs" Link="Production\CustomImpactGeometryPolicy.cs" />

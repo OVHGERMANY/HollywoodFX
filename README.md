@@ -1,15 +1,17 @@
 # HollywoodFX
 
-HollywoodFX expands SPT's impact, explosion, muzzle, gore, ragdoll, and ambient combat effects. This branch targets the official SPT 4.1.3 client build; it is not built against a custom or ported EFT client.
+HollywoodFX expands SPT's impact, explosion, muzzle, gore, ragdoll, and ambient combat effects. This branch targets the official SPT 4.1.4 client build; it is not built against a custom or ported EFT client.
 
 ## Install
 
-Download the current release archive and extract it into the root of an official SPT 4.1.3 installation. The archive installs:
+Download the current release archive and extract it into the root of an official SPT 4.1.4 installation. The archive installs:
 
 - `BepInEx/plugins/HollywoodFX/HollywoodFX.dll`
 - `BepInEx/plugins/HollywoodFX/hollywoodfx`
 
 The `hollywoodfx` asset bundle is required. A DLL by itself is not a complete installation.
+
+Version 2.0.17 retains the hardened Ballistic Impact Sparks system and existing 2.0 configuration. It does not upgrade SPT itself. See the [4.1.4 compatibility audit](docs/SPT-4.1.4-compatibility.md) for the exact build references, serialized-field checks, and remaining runtime tests.
 
 ## Validate
 
@@ -21,7 +23,7 @@ dotnet run --project .\HollywoodFX.Validation\HollywoodFX.Validation.csproj --co
 
 ## Build
 
-Point the project at an official SPT 4.1.3 installation with either `SptRoot` or the `SPT_ROOT` environment variable:
+Point the project at an official SPT 4.1.4 installation with either `SptRoot` or the `SPT_ROOT` environment variable:
 
 ```powershell
 $env:SPT_ROOT = 'E:\Games\SPT'
@@ -36,14 +38,14 @@ dotnet build .\HollywoodFX\HollywoodFX.csproj --configuration Release --target:D
 
 ## Package
 
-The asset bundle is about 1 GB and is intentionally kept outside Git. The packaging script accepts the bundle from an installed copy, verifies its pinned SHA-256, builds the DLL, and creates the deterministic `HollywoodFX-2.0.16.zip` release archive:
+The asset bundle is about 1 GB and is intentionally kept outside Git. The packaging script accepts the bundle from an installed copy, verifies its pinned SHA-256, builds the DLL, and creates the deterministic `HollywoodFX-2.0.17.zip` release archive:
 
 ```powershell
 .\scripts\New-ReleasePackage.ps1 -SptRoot 'E:\Games\SPT'
 ```
 
 Generated archives and checksum files are written under `artifacts/release/`, which Git ignores.
-Prerelease candidates use an explicit unique label, for example `-Version '2.0.16-rc.2'`.
+Prerelease candidates use an explicit unique label, for example `-Version '2.0.17-rc.1'`.
 
 ## Bug reports
 
