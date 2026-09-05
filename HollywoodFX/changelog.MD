@@ -1,3 +1,9 @@
+# 2.0.17
+* Targeted official SPT 4.1.4 (build 072d534, EFT 0.16.9.5.40743) and rebuilt against its patched game assembly and client modules.
+* Audited the 4.1.4 serialized-field changes and muzzle reflection lookups; no effect behavior change or asset-bundle rebuild was needed.
+* Retained the hardened Ballistic Impact Sparks system, particle limits, and existing 2.0 configuration.
+* Added a release-metadata consistency check and documented the exact compatibility evidence and remaining runtime acceptance tests.
+
 # 2.0.16
 * Reworked ballistic impact sparks into one material-, energy-, angle-, and impact-state-aware system.
 * Metallic impacts and ricochets now produce directional, bounded hot-fragment sprays.
